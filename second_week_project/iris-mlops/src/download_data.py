@@ -27,4 +27,7 @@ def download_iris_data():
     return iris_df 
 
 
-#%% call the main function
+#%% call the download_iris_data on main function
+if __name__== '__main.py__':
+    # call the download_iris_data()
+    download_iris_data()
