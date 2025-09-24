@@ -2,7 +2,7 @@
 import os # for operating system operations (like making directory etc...)
 # import numpy as np # for linear algebra, convert to data type
 import pandas as pd # for data manipulation
-# from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 
 
 #%% define clean_iris_data(input_path, output_path)
@@ -28,12 +28,15 @@ def clean_iris_data(input_path = 'data/raw/iris.csv', output_path = 'data/proces
         print("Dropped 'Id' column...")
     
     # apply one hot encoding to the categorical column
-    iris_encoded = pd.get_dummies(iris_cleaned, columns=['species'], drop_first= True)
-    print("Applied OHE to 'species' column...")
+    
+    #iris_encoded = pd.get_dummies(iris_cleaned, columns=['species'], drop_first= True)
+    #print("Applied OHE to 'species' column...")
+    le = LabelEncoder()
+    iris_cleaned['species_encoded'] = le.fit_transform(iris_cleaned['species'])
     # use feature extraction techniques
     
-    iris_encoded['sepal_ratio'] = iris_encoded['sepal_length'] / iris_encoded['sepal_width']
-    iris_encoded['petal_ratio'] = iris_encoded['petal_length'] / iris_encoded['petal_width']
+    iris_cleaned['sepal_ratio'] = iris_cleaned['sepal_length'] / iris_cleaned['sepal_width']
+    iris_cleaned['petal_ratio'] = iris_cleaned['petal_length'] / iris_cleaned['petal_width']
     print("Created new features => 'sepal_ratio' and 'petal_ratio'")
     
     
@@ -41,16 +44,21 @@ def clean_iris_data(input_path = 'data/raw/iris.csv', output_path = 'data/proces
     os.makedirs(os.path.dirname(output_path), exist_ok= True)
     
     # save cleaned and encoded dataset
-    iris_encoded.to_csv(output_path, index = False)
+    iris_cleaned.to_csv(output_path, index = False)
     
     # show some information about cleaned and encoded dataset
     print(f"Encoded dataset saved: {output_path}")
-    print(f"Total Missing Values: \nThere are {iris_encoded.isnull().sum().sum()} missing values")
+    print(f"Total Missing Values: \nThere are {iris_cleaned.isnull().sum().sum()} missing values")
     
-    features = list(iris_encoded.columns)
+    features = list(iris_cleaned.columns)
     
     print(f"Model features: {features}")
     
     # return cleaned and encoded dataset and new features
-    return iris_encoded, features
-        
+    return iris_cleaned, features
+
+
+#%% call the function
+if __name__ == '__main__':
+    clean_iris_data()
+    
