@@ -1,0 +1,97 @@
+# ------------------------------- .gitignore ---------------------------------
+# Bu dosya, projede oluşturulan ve Git'e yüklenmemesi gereken dosyaları ve klasörleri belirtir.
+
+
+#Visual Studio Code
+.vscode/
+
+# Byte-compiled / optimized / DLL files
+pycache/
+*.py[codz]
+*$py.class
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py.cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+#pyenv
+.python-version
+
+pipenv
+Pipfile.lock
+Pipfile
+
+#UV
+uv.lock
+
+#Environments
+.env
+.envrc
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+#Streamlit
+.streamlit/secrets.toml
+
+#PyCharm
+.idea/
+
+#--- MLflow and Machine Learning specific files ---
+# MLflow tracking
+mlruns/
+.mlflow/
+
+# Datasets and processed data
+## Veri klasörünü ve içindeki dosyaları görmezden gelmek önemlidir.
+## Projelerin büyük boyutlu veri dosyalarını içermesi tavsiye edilmez.
+data/
+
+# Model files
+## Eğitilmiş modeller genellikle ayrı olarak yönetilir.
+*.pkl
+*.joblib
+*.sav
+*.h5
+*.model
