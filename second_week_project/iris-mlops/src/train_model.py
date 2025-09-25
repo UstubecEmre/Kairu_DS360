@@ -157,5 +157,6 @@ if __name__ == '__main__':
     # logistic regression model
     lr_model, lr_metrics = train_model('log_reg')
     
-    print("\n******Models are trained and saved:******)")
+    ## print("\n******Models are trained and saved:******)")
+    print("All models successfully trained and stored in the 'models' directory.")
     

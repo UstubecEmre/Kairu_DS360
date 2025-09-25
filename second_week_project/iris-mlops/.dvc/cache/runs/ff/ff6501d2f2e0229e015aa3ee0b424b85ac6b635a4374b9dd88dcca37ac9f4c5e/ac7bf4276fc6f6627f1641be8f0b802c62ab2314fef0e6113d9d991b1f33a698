@@ -1,0 +1,31 @@
+cmd: python src/train_model.py
+deps:
+- path: data/processed/iris_processed.csv
+  hash: md5
+  md5: d351f617c890c5344fd2114274ca0cb6
+  size: 8796
+- path: src/train_model.py
+  hash: md5
+  md5: 6a7a32ad7c3276d881ffce41a642a081
+  size: 5099
+outs:
+- path: models/features.json
+  hash: md5
+  md5: 10e9f377b8e0c37f79bfa912ccc54dbc
+  size: 125
+- path: models/log_reg_model.pkl
+  hash: md5
+  md5: de213d76102ade1af1875a38ee211ea5
+  size: 1459
+- path: models/metrics.json
+  hash: md5
+  md5: d96dea0512ba8d7ee285f680d3e95239
+  size: 190
+- path: models/random_forest_model.pkl
+  hash: md5
+  md5: a55207659180e8152f95dfa78769f261
+  size: 70097
+- path: models/svc_model.pkl
+  hash: md5
+  md5: f84f98ab686131a4127b294fd4c1c0e1
+  size: 6995

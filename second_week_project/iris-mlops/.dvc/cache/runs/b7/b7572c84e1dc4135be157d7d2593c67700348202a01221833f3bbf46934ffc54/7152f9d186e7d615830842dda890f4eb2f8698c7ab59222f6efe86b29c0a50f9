@@ -1,0 +1,15 @@
+cmd: python src/clean_data.py
+deps:
+- path: data/raw/iris.csv
+  hash: md5
+  md5: 500a0acbd112b7c512929eac892f9864
+  size: 4009
+- path: src/clean_data.py
+  hash: md5
+  md5: 7614b5c155b9cf61b0a8c2ad13986034
+  size: 2441
+outs:
+- path: data/processed/iris_processed.csv
+  hash: md5
+  md5: d351f617c890c5344fd2114274ca0cb6
+  size: 8796

@@ -1,0 +1,8 @@
+{
+    "model_type": "log_reg",
+    "accuracy_score": 0.9333333333333333,
+    "f1_score": 0.9333333333333333,
+    "n_features": 6,
+    "n_train_samples": 120,
+    "n_test_sample": 30
+}

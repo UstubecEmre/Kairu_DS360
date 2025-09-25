@@ -1,0 +1,11 @@
+cmd: python src/download_data.py
+deps:
+- path: src/download_data.py
+  hash: md5
+  md5: 2ec186da55ca1b44ea4e31b1b2cd7bb6
+  size: 1034
+outs:
+- path: data/raw/iris.csv
+  hash: md5
+  md5: 500a0acbd112b7c512929eac892f9864
+  size: 4009

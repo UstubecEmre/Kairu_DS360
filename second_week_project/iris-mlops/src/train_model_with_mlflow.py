@@ -157,4 +157,4 @@ def train_model_with_mlflow():
 if __name__ == '__main__':
     print("****** Training model with MLFlow ******")
     best_model, best_acc = train_model_with_mlflow()
-    print('\nTo view MLFLOW UI: mlflow ui ')
+    print('\nTo view MLFLOW UI: mlflow ui')
