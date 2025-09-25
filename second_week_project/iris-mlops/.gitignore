@@ -25,6 +25,7 @@ data/processed/titanic_processed.csv
 # DVC
 /data/raw/titanic.csv
 /data/processed/titanic_processed.csv
+.dvc/cache/
 
 # MLflow
 mlruns/
@@ -43,3 +44,4 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
