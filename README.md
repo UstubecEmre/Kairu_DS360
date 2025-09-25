@@ -9,14 +9,23 @@ Bu eğitim kapsamında çeşitli sektörlerle ilgili **veri bilimi** projeleri g
 ## Eğitim Müfredatı:
 
 **1.Hafta**: Python ve Veri Bilimine Giriş
+
 **2.Hafta**: MLOps'a Giriş(DVC, MLFlow, GitHub Actions...)
+
 **3.Hafta**: İlgili hafta eklenecektir.
+
 **4.Hafta**: İlgili hafta eklenecektir.
+
 **5.Hafta**: İlgili hafta eklenecektir.
+
 **6.Hafta**: İlgili hafta eklenecektir.
+
 **7.Hafta**: İlgili hafta eklenecektir.
+
 **8.Hafta**: İlgili hafta eklenecektir.
+
 **9.Hafta**: İlgili hafta eklenecektir.
+
 **10.Hafta**: İlgili hafta eklenecektir.
 
 ## MLOps'a Giriş:
