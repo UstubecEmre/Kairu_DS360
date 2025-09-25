@@ -1,0 +1,45 @@
+# for Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# for Jupyter Notebook
+.ipynb_checkpoints
+
+# for Models
+*.pkl
+*.joblib
+models/
+
+# for datasets
+data/raw/titanic.csv
+data/processed/titanic_processed.csv
+
+# DVC
+/data/raw/titanic.csv
+/data/processed/titanic_processed.csv
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
