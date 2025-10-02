@@ -127,4 +127,13 @@ def get_split_data(test_size = 0.2, random_state = 42):
                                                         ,random_state = random_state
                                                         ,stratify= y)
     return X_train, X_test, y_train, y_test, pre
-    
+
+
+
+#%% call main function (ana fonksiyonu cagir)
+if __name__ == '__main__':
+    X_train, X_test, y_train, y_test, preprocessor = get_split_data()
+    print('Egitim Setinin Boyutu:', X_train.shape)
+    print('Test Setinin Boyutu:', X_test.shape)
+    print('Egitim Setindeki Hedef Degiskenin Frekans Dagilimi:\n', y_train.value_counts())
+    print('Egitim Setindeki Hedef Degiskenin Oransal Dagilimi:\n', y_train.value_counts(normalize = True).round(4).to_dict())
