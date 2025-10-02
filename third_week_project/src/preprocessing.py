@@ -116,3 +116,15 @@ def split_x_and_y(df: pd.DataFrame):
     )
     
     return X, y, preprocessor
+
+
+def get_split_data(test_size = 0.2, random_state = 42):
+    loan_df = load_loan_data()
+    X, y, pre =split_x_and_y(loan_df)
+    X_train, X_test, y_train, y_test = train_test_split(X 
+                                                        ,y 
+                                                        ,test_size = test_size
+                                                        ,random_state = random_state
+                                                        ,stratify= y)
+    return X_train, X_test, y_train, y_test, pre
+    
