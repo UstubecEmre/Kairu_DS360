@@ -6,7 +6,7 @@ import pandas as pd
 #%% define load_data() function (load_data() fonksiyonunu tanimla)
 def download_loan_data():
     """Loan datasetini indirir ve data klasorune kaydeder"""
-    os.makedirs("data/raw",exist_ok = True)
+    os.makedirs("third_week_project/data/raw",exist_ok = True)
     
     try:
         loan_df = pd.read_csv(r'D:\Datasets\loan_dataset.csv')
@@ -17,8 +17,8 @@ def download_loan_data():
     except Exception as e:
         raise Exception(f"Veri yuklenirken bir hata olustu: {e}")
     
-    loan_df.to_csv('data/raw/loan_data.csv',index = False)
-    
+    loan_df.to_csv(r'third_week_project/data/raw/loan_data.csv',index = False)
+   
     return loan_df
 
 
