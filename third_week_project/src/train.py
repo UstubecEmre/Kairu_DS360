@@ -53,3 +53,31 @@ def calculate_class_ratio(y):
     return positive, negative, positive_weight
 
 
+#%% evaluate model function (model degerlendirme fonksiyonunu tanimla)
+def evaluate_and_print_model(title:str, y_test:np.ndarray, y_pred:np.ndarray, y_proba:np.ndarray):
+    if title is None or not isinstance(title, str):
+        print("Model basligi gecerli bir string olmalidir.")
+        return False
+    if y_test is None or y_pred is None or y_proba is None:
+        print("y_test, y_pred ve y_proba gecerli degerler olmalidir.")
+        return False
+    
+    print(f"***** {title} *****")
+    print("Siniflandirma Raporu (Classification Report):\n",classification_report(y_test, y_pred, digits= 4))
+    
+    report = classification_report(y_test, y_pred, digits=4, output_dict=True)
+    
+    try:
+        if y_proba.ndim > 1 and y_proba.shape[1] > 1:
+            y_proba = y_proba[:, 1] # positive class probabilities (pozitif sinifin olasiligi)
+        print("Egri Altindaki Alan (AUC):", roc_auc_score(y_test, y_proba).round(4))
+        auc = roc_auc_score(y_test, y_proba).round(4)
+    except Exception as err:
+        auc = None
+        print(f"AUC Hesaplanamadi: {err}")
+    
+    # for returning values (degerleri dondurmek icin)
+    return {
+        "classification_report":report,
+        "roc_auc":auc
+    }
