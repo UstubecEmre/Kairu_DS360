@@ -45,3 +45,11 @@ def ensure_artifacts_dir():
     return artifacts_dir
 
 
+#%% define class ratio function (sinif orani fonksiyonunu tanimla)
+def calculate_class_ratio(y):
+    positive = np.sum(y == 1)
+    negative = np.sum(y == 0)
+    positive_weight = (positive / negative) if positive > 0 else 1
+    return positive, negative, positive_weight
+
+
