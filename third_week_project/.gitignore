@@ -1,0 +1,59 @@
+#--------------------------------- ignore -------------------------------
+
+# for Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# For Virtual Environment (SanaL Ortamlar)
+venv/
+env/
+ENV/
+
+# For Jupyter Notebook (Jupyter Notebook Ortami)
+.ipynb_checkpoints
+
+# For Data files (ignore large datasets but keep essential ones) (Buyuk hacme sahip veri dosyalari)
+data/*.csv
+data/*.json
+data/*.xlsx
+!data/sample_data.csv
+!data/loan_data.csv
+
+# For Models (ignore models/ directory but keep artifacts/) (Modeller)
+models/
+*.pkl
+*.joblib
+
+# to Keep artifacts for deployment (Dagitim icin artifactsleri tutalim)
+!artifacts/
+!artifacts/*.pkl
+!artifacts/*.json
+
+# For Streamlit (Streamlit uygulamasi icin)
+.streamlit/
+
+# For IDE (Tumlesik Gelistirme Ortamlari Icin)
+.vscode/
+.idea/
+
+# For OS (Isletim sistemleri icin)
+.DS_Store
+Thumbs.db
