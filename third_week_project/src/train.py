@@ -196,4 +196,130 @@ def scenario_no_resampling(save_tag = '_cw'):
     }
 
 
-#%% 
+#%% define scenario_with_sampler()
+# Veri dengesizligini onlemek icin Resampling gerceklestirelim.
+# Onemli Not: (sadece TRAIN’e yani egitim setine uygulanmalidiri)
+# Bu senaryonun kolon şeması da ayrıca kaydedilir (etiket: under veya smote).
+
+
+def scenario_with_sampler(sampler, tag, return_results: bool = True):
+    artifacts_dir = ensure_artifacts_dir()
+    X_train, X_test, y_train, y_test, pre = get_split_data()
+    
+    with open(f"{artifacts_dir}/feature_schema_{tag}.json", mode= "w") as file:
+        json.dump(
+        {"columns": list(X_train.columns)}
+        ,fp = file
+        ,indent = 4)
+    
+    # Not: fit_transform sadece X_train'de uygulanir.
+    # X_test'de sadece fit() uygulanir. Bu veri sizintisini onlemektedir.
+    X_train_transformed = pre.fit_transform(X_train)
+    X_transformed_resampled, y_resampled = sampler.fit_resample(X_train_transformed, y_train)
+    
+    
+    # 1-build a Logistic Regression model (Lojistik regresyon modelini olustur)
+    log_reg = LogisticRegression(
+        max_iter = 1500
+        ,C = 0.8
+        ,tol = 0.001
+    )
+    
+    # fit model(modeli egit)
+    log_reg.fit(X_transformed_resampled, y_resampled)
+    
+    # apply only transform() function for test dataset (test veri seti icin transform uygula )
+    X_test_transformed = pre.transform(X_test)
+    y_pred_lr = log_reg.predict(X_test_transformed)
+    y_proba_lr = log_reg.predict_proba(X_test_transformed)[:, 1]
+    log_reg_result = evaluate_and_print_model(
+        f"Logistic Regression model with ({sampler.__class__.__name__})"
+        ,y_test
+        ,y_pred_lr
+        ,y_proba_lr)
+    
+    
+    # build random forest classifier model
+    rfc = RandomForestClassifier(
+        n_estimators = 150
+        ,random_state = 42
+        ,max_depth = 10
+        ,min_samples_split = 5
+    )
+    
+    # fit model
+    rfc.fit(X_transformed_resampled, y_resampled)
+    y_pred_rfc = rfc.predict(X_test_transformed)
+    y_proba_rfc = rfc.predict_proba(X_test_transformed)[:, 1] # positive
+    rfc_result = evaluate_and_print_model(
+       f"Random Forest Classifier Model with ({sampler.__class__.__name__})"
+       ,y_test
+       ,y_pred_rfc
+       ,y_proba_rfc
+    )
+    
+    # build XGBoost model
+    xgb = XGBClassifier(
+        n_estimators = 500
+        ,random_state = 42
+        ,max_depth = 7
+        ,learning_rate = 0.05
+        ,subsample = 0.8
+        ,colsample_bytree = 0.8
+        ,reg_lambda = 1
+        ,eval_metric = "logloss"
+    )
+    
+    # fit model
+    xgb.fit(X_transformed_resampled, y_resampled)
+    y_pred_xgb = xgb.predict(X_test_transformed)
+    y_proba_xgb = xgb.predict_proba(X_test_transformed)[:, 1] 
+    xgb_result = evaluate_and_print_model(
+        f"XGBoost Model with ({sampler.__class__.__name__})"
+        ,y_test
+        ,y_pred_xgb
+        ,y_proba_xgb
+    )
+    
+    # save all models
+    joblib.dump(pre, 
+                f"{artifacts_dir}/preprocessor_{tag}.pkl")
+    
+    joblib.dump(log_reg,
+                f"{artifacts_dir}/model_log_reg_{tag}.pkl")
+    
+    joblib.dump(rfc,
+                f"{artifacts_dir}/model_rfc_{tag}.pkl")
+    
+    joblib.dump(xgb,
+                f"{artifacts_dir}/model_xgb_{tag}.pkl")
+    
+    if return_results:
+        return {
+            "log_reg":log_reg_result
+            ,"rfc":rfc_result
+            ,"xgb":xgb_result
+        }
+
+def main():
+    """main fonksiyonunda bu fonksiyonlari cagiralim. Herhangi bir ornekleme olmayan versiyonu cagir
+    Diger dengesiz veri ile basa cikma yontemlerinden SMOTE (sentetik veri uretimi) ile RandomUnderSampler yontemini gerceklestirelim.
+    """
+    # normal class weight
+    scenario_no_resampling(save_tag = "_cw")
+    
+    # random undersampling    
+    scenario_with_sampler(
+        sampler = RandomUnderSampler(random_state=42)
+        ,tag = "under"
+    )
+    
+    # SMOTE
+    scenario_with_sampler(
+        sampler = SMOTE(random_state = 42)
+        ,tag = 'smote'
+    )
+    
+
+if __name__ == '__main__':
+    main()
