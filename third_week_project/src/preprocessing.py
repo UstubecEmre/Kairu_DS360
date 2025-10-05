@@ -11,7 +11,10 @@ from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
+from imblearn.under_sampling import RandomUnderSampler
+from imblearn.over_sampling import SMOTE
 
+import json 
 
 #%% 
 """
@@ -127,9 +130,63 @@ def get_split_data(test_size = 0.2, random_state = 42):
                                                         ,random_state = random_state
                                                         ,stratify= y)
     return X_train, X_test, y_train, y_test, pre
+# helper functions (yardımcı fonksiyonlarimiz)
+def ensure_processed_dir():
+    os.makedirs("data/processed", exist_ok= True)
+#%% define class ratio function (sinif orani fonksiyonunu tanimla)
+def calculate_class_ratio(y):
+    positive = np.sum(y == 1)
+    negative = np.sum(y == 0)
+    positive_weight = (positive / negative) if positive > 0 else 1
+    return positive, negative, positive_weight
 
-
-
+def save_processed_data():
+    #save train_original.csv (egitim setinin orijinal halini kaydet)
+    ensure_processed_dir()
+    X_train, X_test, y_train, y_test, _ = get_split_data()
+    
+    
+    train_df = pd.concat([X_train, y_train.rename('target')], axis = 1)
+    test_df = pd.concat([X_test, y_test.rename('target')], axis = 1)
+    train_df.to_csv("data/processed/train_original.csv", index = False)
+    test_df.to_csv("data/processed/test_original.csv", index = False)
+    
+    #save original class weights
+    # save class_weights.json
+    positive, negative, positive_weight = calculate_class_ratio(y_train)
+    
+    
+    with open("data/processed/class_weights.json", mode = "w") as file:
+        json.dump({
+            "positive":int(positive)
+            ,"negative":int(negative)
+            ,"positive_weight": float(positive_weight)
+        }
+            ,file
+            ,indent = 4)
+    
+    # save train_smote.csv
+    smote_X, smote_y = SMOTE(random_state=42).fit_resample(X_train, y_train)
+    smote_df = pd.DataFrame(smote_X, columns = X_train.columns)
+    smote_df['target'] = smote_y 
+    smote_df.to_csv("data/processed/train_smote.csv", index = False)   
+        
+        # save undersampled csv
+    undersampled_X, undersampled_y = RandomUnderSampler(random_state = 42).fit_resample(X_train, y_train)
+    undersampled_df = pd.DataFrame(undersampled_X, columns = X_train.columns)
+    undersampled_df['target'] = undersampled_y
+    undersampled_df.to_csv("data/processed/train_undersampled.csv", index = False)
+    print("Islenmis veriler basariyla kaydediliyor...")
+    
+    
+    # return all train and test files
+    return {
+        "train_original": "data/processed/train_original.csv",
+        "test_original": "data/processed/test_original.csv",
+        "train_smote": "data/processed/train_smote.csv",
+        "train_undersampled": "data/processed/train_undersampled.csv",
+        "class_weights": "data/processed/class_weights.json"
+    }
 #%% call main function (ana fonksiyonu cagir)
 if __name__ == '__main__':
     X_train, X_test, y_train, y_test, preprocessor = get_split_data()
@@ -137,3 +194,4 @@ if __name__ == '__main__':
     print('Test Setinin Boyutu:', X_test.shape)
     print('Egitim Setindeki Hedef Degiskenin Frekans Dagilimi:\n', y_train.value_counts())
     print('Egitim Setindeki Hedef Degiskenin Oransal Dagilimi:\n', y_train.value_counts(normalize = True).round(4).to_dict())
+    save_processed_data()
