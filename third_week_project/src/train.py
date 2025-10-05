@@ -18,7 +18,7 @@ from sklearn.metrics import classification_report, confusion_matrix, roc_auc_sco
 # for resampling (yeniden ornekleme icin)
 from imblearn.over_sampling import SMOTE
 from imblearn.under_sampling import RandomUnderSampler
-from preprocessing import preprocess_loan_data
+# from preprocessing import preprocess_loan_data
 
 # for ignoring warnings (uyarilari yoksayma icin)
 from warnings import filterwarnings
@@ -29,6 +29,7 @@ import joblib
 import json
 
 from sklearn.pipeline import Pipeline
+from preprocessing import ensure_processed_dir, get_split_data, calculate_class_ratio
 
 """ 
 Amac: Loan veri seti uzerinde model egitimi yapmak.
@@ -47,13 +48,11 @@ def ensure_artifacts_dir():
     os.makedirs(artifacts_dir, exist_ok=True)
     return artifacts_dir
 
-artifacts_dir = ensure_artifacts_dir()
-#%% define class ratio function (sinif orani fonksiyonunu tanimla)
-def calculate_class_ratio(y):
-    positive = np.sum(y == 1)
-    negative = np.sum(y == 0)
-    positive_weight = (positive / negative) if positive > 0 else 1
-    return positive, negative, positive_weight
+
+
+
+
+
 
 
 #%% evaluate model function (model degerlendirme fonksiyonunu tanimla)
@@ -64,12 +63,13 @@ def evaluate_and_print_model(title:str, y_test:np.ndarray, y_pred:np.ndarray, y_
     if y_test is None or y_pred is None or y_proba is None:
         print("y_test, y_pred ve y_proba gecerli degerler olmalidir.")
         return False
-    
+    print("="*80)
     print(f"***** {title} *****")
     print("Siniflandirma Raporu (Classification Report):\n",classification_report(y_test, y_pred, digits= 4))
     
     report = classification_report(y_test, y_pred, digits=4, output_dict=True)
-    
+    conf_matrix = confusion_matrix(y_test, y_pred)
+    print(f"Karmasiklik Matrisi Gosteriliyor...\n{conf_matrix}") 
     try:
         if y_proba.ndim > 1 and y_proba.shape[1] > 1:
             y_proba = y_proba[:, 1] # positive class probabilities (pozitif sinifin olasiligi)
@@ -78,10 +78,11 @@ def evaluate_and_print_model(title:str, y_test:np.ndarray, y_pred:np.ndarray, y_
     except Exception as err:
         auc = None
         print(f"AUC Hesaplanamadi: {err}")
-    
+    print("="*80)
     # for returning values (degerleri dondurmek icin)
     return {
         "classification_report":report,
+        "confusion_matrix":conf_matrix,
         "roc_auc":auc
     }
 
@@ -91,12 +92,12 @@ def evaluate_and_print_model(title:str, y_test:np.ndarray, y_pred:np.ndarray, y_
 def scenario_no_resampling(save_tag = '_cw'):
     """Herhangi bir yeniden ornekleme yapmadan model egitimi yapar.
     Kullanilacak makine ogrenme algoritmalari: Logistic Regression, Random Forest, XGBoost"""
-
-    ensure_artifacts_dir()
+    
+    artifacts_dir = ensure_artifacts_dir()
     X_train, X_test, y_train, y_test, pre = get_split_data()
     
     # save feature names (ozellik isimlerini kaydet)
-    with open('{artifacts_dir}/feature_schema.json',"w") as file:
+    with open(f'{artifacts_dir}/feature_schema.json',"w") as file:
         json.dump({"columns": list(X_train.columns)}, file, indent = 4)
     
     
@@ -203,8 +204,12 @@ def scenario_no_resampling(save_tag = '_cw'):
 
 
 def scenario_with_sampler(sampler, tag, return_results: bool = True):
+    ensure_processed_dir()
+    
     artifacts_dir = ensure_artifacts_dir()
+    
     X_train, X_test, y_train, y_test, pre = get_split_data()
+    
     
     with open(f"{artifacts_dir}/feature_schema_{tag}.json", mode= "w") as file:
         json.dump(
@@ -216,7 +221,7 @@ def scenario_with_sampler(sampler, tag, return_results: bool = True):
     # X_test'de sadece fit() uygulanir. Bu veri sizintisini onlemektedir.
     X_train_transformed = pre.fit_transform(X_train)
     X_transformed_resampled, y_resampled = sampler.fit_resample(X_train_transformed, y_train)
-    
+  
     
     # 1-build a Logistic Regression model (Lojistik regresyon modelini olustur)
     log_reg = LogisticRegression(
@@ -240,7 +245,7 @@ def scenario_with_sampler(sampler, tag, return_results: bool = True):
     
     
     # build random forest classifier model
-    rfc = RandomForestClassifier(
+    rf = RandomForestClassifier(
         n_estimators = 150
         ,random_state = 42
         ,max_depth = 10
@@ -248,14 +253,14 @@ def scenario_with_sampler(sampler, tag, return_results: bool = True):
     )
     
     # fit model
-    rfc.fit(X_transformed_resampled, y_resampled)
-    y_pred_rfc = rfc.predict(X_test_transformed)
-    y_proba_rfc = rfc.predict_proba(X_test_transformed)[:, 1] # positive
-    rfc_result = evaluate_and_print_model(
+    rf.fit(X_transformed_resampled, y_resampled)
+    y_pred_rf = rf.predict(X_test_transformed)
+    y_proba_rf = rf.predict_proba(X_test_transformed)[:, 1] # positive
+    rf_result = evaluate_and_print_model(
        f"Random Forest Classifier Model with ({sampler.__class__.__name__})"
        ,y_test
-       ,y_pred_rfc
-       ,y_proba_rfc
+       ,y_pred_rf
+       ,y_proba_rf
     )
     
     # build XGBoost model
@@ -288,17 +293,20 @@ def scenario_with_sampler(sampler, tag, return_results: bool = True):
     joblib.dump(log_reg,
                 f"{artifacts_dir}/model_log_reg_{tag}.pkl")
     
-    joblib.dump(rfc,
-                f"{artifacts_dir}/model_rfc_{tag}.pkl")
+    joblib.dump(rf,
+                f"{artifacts_dir}/model_rf_{tag}.pkl")
     
     joblib.dump(xgb,
                 f"{artifacts_dir}/model_xgb_{tag}.pkl")
     
     if return_results:
         return {
-            "log_reg":log_reg_result
-            ,"rfc":rfc_result
-            ,"xgb":xgb_result
+            "scenario": tag or "no_resampling"
+            ,"models":{
+                "log_reg":log_reg_result
+                ,"rf":rf_result
+                ,"xgb":xgb_result
+        }
         }
 
 def main():
@@ -306,20 +314,48 @@ def main():
     Diger dengesiz veri ile basa cikma yontemlerinden SMOTE (sentetik veri uretimi) ile RandomUnderSampler yontemini gerceklestirelim.
     """
     # normal class weight
-    scenario_no_resampling(save_tag = "_cw")
+    print("Yeniden Ornekleme Olmadan Egitim Gerceklestiriliyor...")
+    result_cw =scenario_no_resampling(save_tag = "_cw")
     
     # random undersampling    
-    scenario_with_sampler(
+    print("RandomUnderSampler Yontemi ile Egitim Gerceklestiriliyor...")
+    result_undersampler = scenario_with_sampler(
         sampler = RandomUnderSampler(random_state=42)
         ,tag = "under"
     )
     
     # SMOTE
-    scenario_with_sampler(
+    print("Sentetik Veri Uretimi Yontemi ile Egitim Gerceklestiriliyor...")
+    result_smote = scenario_with_sampler(
         sampler = SMOTE(random_state = 42)
         ,tag = 'smote'
     )
     
 
+def save_metrics(metrics_dictionary, file_path = 'artifacts/metrics.json'):
+    """Model performansini daha iyi degerlendirebilmek amaciyla metrik degerlerini kaydeder """
+    os.makedirs(os.path.dirname(file_path), exist_ok= True)
+    with open(file_path, mode = "w") as file:
+        json.dump(metrics_dictionary, file, indent = 4)
+    print(f"Metrikler kaydediliyor. Dosya yolu: {file_path}")
+    
+    
+    
 if __name__ == '__main__':
-    main()
+    # main()
+    result_cw =scenario_no_resampling(save_tag = "_cw")
+    result_undersampler = scenario_with_sampler(
+        sampler = RandomUnderSampler(random_state=42)
+        ,tag = "under"
+    )
+    result_smote = scenario_with_sampler(
+        sampler = SMOTE(random_state = 42)
+        ,tag = 'smote'
+    )
+    
+    all_metrics = {
+        "no_resampling":result_cw
+        ,"undersampling":result_undersampler
+        ,"smote": result_smote
+    }
+    save_metrics(all_metrics)
