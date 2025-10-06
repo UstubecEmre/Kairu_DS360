@@ -1,0 +1,133 @@
+schema: '2.0'
+stages:
+  data_loader:
+    cmd: python src/data_loader.py
+    deps:
+    - path: src/data_loader.py
+      hash: md5
+      md5: e5b55368f1ca1d3c65e50ecd02fd6525
+      size: 2198
+    outs:
+    - path: data/raw/loan_data.csv
+      hash: md5
+      md5: fbd876905728e2654528adb79b8e9345
+      size: 39185
+  eda:
+    cmd: python src/eda.py
+    deps:
+    - path: data/raw/loan_data.csv
+      hash: md5
+      md5: fbd876905728e2654528adb79b8e9345
+      size: 39185
+    - path: src/eda.py
+      hash: md5
+      md5: e5808caf44ab6c44a0142fab3509deae
+      size: 3299
+  preprocessing:
+    cmd: python src/preprocessing.py
+    deps:
+    - path: data/raw/loan_data.csv
+      hash: md5
+      md5: fbd876905728e2654528adb79b8e9345
+      size: 39185
+    - path: src/preprocessing.py
+      hash: md5
+      md5: 7f124fbfa7cf9cb929e31754bee8ca2d
+      size: 10020
+    outs:
+    - path: data/processed/class_weights.json
+      hash: md5
+      md5: 1ca0eaba021b50890b2291d0123e80ef
+      size: 91
+    - path: data/processed/test_original.csv
+      hash: md5
+      md5: 586043c5d2a133034dfa5d42441c65b5
+      size: 7301
+    - path: data/processed/train_original.csv
+      hash: md5
+      md5: 23c467fefe0324c265d46b85dc7bb2ea
+      size: 29086
+    - path: data/processed/train_smote.csv
+      hash: md5
+      md5: b2f9549fb68a6507ff319b70e7989180
+      size: 168480
+    - path: data/processed/train_undersampled.csv
+      hash: md5
+      md5: e309ef1412f0381fe5e56eabf3d2bf09
+      size: 112320
+  train:
+    cmd: python src/train.py
+    deps:
+    - path: data/processed/test_original.csv
+      hash: md5
+      md5: 586043c5d2a133034dfa5d42441c65b5
+      size: 7301
+    - path: data/processed/train_original.csv
+      hash: md5
+      md5: 23c467fefe0324c265d46b85dc7bb2ea
+      size: 29086
+    - path: src/preprocessing.py
+      hash: md5
+      md5: 7f124fbfa7cf9cb929e31754bee8ca2d
+      size: 10020
+    - path: src/train.py
+      hash: md5
+      md5: d725a2b3e06bd9de046f913a71e5b1c3
+      size: 16518
+    outs:
+    - path: artifacts/feature_schema_cw.json
+      hash: md5
+      md5: 56afd1e67e231a12023cadd4e8688dd2
+      size: 234
+    - path: artifacts/feature_schema_smote.json
+      hash: md5
+      md5: 56afd1e67e231a12023cadd4e8688dd2
+      size: 234
+    - path: artifacts/feature_schema_under.json
+      hash: md5
+      md5: 56afd1e67e231a12023cadd4e8688dd2
+      size: 234
+    - path: artifacts/metrics.json
+      hash: md5
+      md5: cab8dba01e097c73612315f342740c7f
+      size: 11161
+    - path: artifacts/model_logisticregression__cw.pkl
+      hash: md5
+      md5: 2dcf984d7a6d270c9c667195c5f09801
+      size: 927
+    - path: artifacts/model_logisticregression_smote.pkl
+      hash: md5
+      md5: bf1669cec28468fa42c85be8c8d586e4
+      size: 927
+    - path: artifacts/model_logisticregression_under.pkl
+      hash: md5
+      md5: d317a3093794546723d6a6233ec12212
+      size: 927
+    - path: artifacts/model_randomforest__cw.pkl
+      hash: md5
+      md5: 6a312eb14242887032f42bc65732d0c6
+      size: 243097
+    - path: artifacts/model_randomforest_smote.pkl
+      hash: md5
+      md5: 221f8645415888b20d3ef02ef15d36d4
+      size: 216457
+    - path: artifacts/model_randomforest_under.pkl
+      hash: md5
+      md5: 4b255908b2a1612eebc632ab61f77d4a
+      size: 222217
+    - path: artifacts/model_xgboost__cw.pkl
+      hash: md5
+      md5: 447337a4f36a226cb5de16e033127c29
+      size: 118257
+    - path: artifacts/model_xgboost_smote.pkl
+      hash: md5
+      md5: a9bbacf1ea58a0a1168b7c3ec6fb15be
+      size: 119377
+    - path: artifacts/model_xgboost_under.pkl
+      hash: md5
+      md5: b661f5a32aeaf3045a246993232f59e3
+      size: 118492
+    - path: artifacts/preprocessor_cw.pkl
+      hash: md5
+      md5: 2b8d4b13b1215ae42258f8868e4fdfba
+      size: 3826

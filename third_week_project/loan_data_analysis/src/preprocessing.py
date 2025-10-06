@@ -27,14 +27,15 @@ loan_id gibi kardinal degiskenleri kaldir.
 Tarih degiskenlerinden yeni degiskenler turet.
 """
 
-DATA_PATH = r'D:\Datasets\loan_dataset.csv'
+DATA_PATH = r'D:/Datasets/loan_dataset.csv'
 TARGET_COL = 'loan_status'
 LEAKAGE_COLS = ['paid_off_time','past_due_days']
 
-DROP_COLS = ['loan_id',TARGET_COL] + LEAKAGE_COLS
+DROP_COLS = ['Loan_ID',TARGET_COL] + LEAKAGE_COLS
 # DROP_COLS = ['loan_id', 'loan_status','paid_off_time', 'past_due_days']
 
-
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # proje kökü
+PROCESSED_DIR = os.path.join(BASE_DIR, "data/processed")
 # %% define feature engineering function (ozellik muhendisligi fonksiyonunu tanimla)
 def _feature_engineering_on_loan_df(df: pd.DataFrame) -> pd.DataFrame:
 
@@ -54,7 +55,7 @@ def _feature_engineering_on_loan_df(df: pd.DataFrame) -> pd.DataFrame:
         if col in df.columns:
             # df[col] = pd.to_datetime(df[col],errors = 'coerce').astype(np.int64) // 10 ** 9
             # more readable way (Daha okunabilir yontem)
-            df[col] = pd.to_datetime(df[col], errors='coerce').dt.floor('s').astype(int)
+            df[col] = pd.to_datetime(df[col], errors='coerce').astype('int64') // 10**9 # dt.floor('s').astype('int64')
 
     # if 'Principal' and 'terms' in df.columns:
     if 'Principal' in df.columns and 'terms' in df.columns:
@@ -121,18 +122,22 @@ def split_x_and_y(df: pd.DataFrame):
     return X, y, preprocessor
 
 
+
+                                                        #,stratify= y)
+    return X_train, X_test, y_train, y_test, pre
+# helper functions (yardımcı fonksiyonlarimiz)
+def ensure_processed_dir():
+    os.makedirs(PROCESSED_DIR, exist_ok=True)
+    return PROCESSED_DIR
+
+
 def get_split_data(test_size = 0.2, random_state = 42):
     loan_df = load_loan_data()
     X, y, pre =split_x_and_y(loan_df)
     X_train, X_test, y_train, y_test = train_test_split(X 
                                                         ,y 
                                                         ,test_size = test_size
-                                                        ,random_state = random_state
-                                                        ,stratify= y)
-    return X_train, X_test, y_train, y_test, pre
-# helper functions (yardımcı fonksiyonlarimiz)
-def ensure_processed_dir():
-    os.makedirs("data/processed", exist_ok= True)
+                                                        ,random_state = random_state)
 #%% define class ratio function (sinif orani fonksiyonunu tanimla)
 def calculate_class_ratio(y):
     positive = np.sum(y == 1)
@@ -143,20 +148,61 @@ def calculate_class_ratio(y):
 def save_processed_data():
     #save train_original.csv (egitim setinin orijinal halini kaydet)
     ensure_processed_dir()
-    X_train, X_test, y_train, y_test, _ = get_split_data()
+    X_train, X_test, y_train, y_test, preprocessor = get_split_data()  # preprocessor'ı al
     
+    # Pipeline ile sayısala çevir
+    X_train_encoded = preprocessor.fit_transform(X_train)
+    X_test_encoded = preprocessor.transform(X_test)
+    
+    # train_original ve test_original CSV
+    pd.concat([X_train, y_train.rename('target')], axis=1)\
+        .to_csv(os.path.join(PROCESSED_DIR, "train_original.csv"), index=False)
+    pd.concat([X_test, y_test.rename('target')], axis=1)\
+        .to_csv(os.path.join(PROCESSED_DIR, "test_original.csv"), index=False)
+    
+    # class_weights.json
+    positive, negative, positive_weight = calculate_class_ratio(y_train)
+    with open(os.path.join(PROCESSED_DIR, "class_weights.json"), "w") as f:
+        json.dump({
+            "positive": int(positive),
+            "negative": int(negative),
+            "positive_weight": float(positive_weight)
+        }, f, indent=4)
+    
+    # SMOTE ve undersample
+    smote_X, smote_y = SMOTE(random_state=42).fit_resample(X_train_encoded, y_train)
+    undersampled_X, undersampled_y = RandomUnderSampler(random_state=42).fit_resample(X_train_encoded, y_train)
+    
+    # SMOTE ve undersampled CSV (NumPy array olduğu için header yok)
+    np.savetxt(os.path.join(PROCESSED_DIR, "train_smote.csv"), 
+               np.hstack([smote_X, smote_y.values.reshape(-1,1)]), delimiter=",")
+    np.savetxt(os.path.join(PROCESSED_DIR, "train_undersampled.csv"), 
+               np.hstack([undersampled_X, undersampled_y.values.reshape(-1,1)]), delimiter=",")
+    
+    print("Islenmis veriler basariyla kaydedildi.")
+
+    """ I got an error => hata verdi
+    ensure_processed_dir()
+    X_train, X_test, y_train, y_test, _ = get_split_data()
+    X_train_encoded = preprocessor.fit_transform(X_train)
+    X_test_encoded = preprocessor.transform(X_test)
+ 
     
     train_df = pd.concat([X_train, y_train.rename('target')], axis = 1)
     test_df = pd.concat([X_test, y_test.rename('target')], axis = 1)
-    train_df.to_csv("data/processed/train_original.csv", index = False)
-    test_df.to_csv("data/processed/test_original.csv", index = False)
+    
+    train_path = os.path.join(PROCESSED_DIR, "train_original.csv")
+    test_path = os.path.join(PROCESSED_DIR, "test_original.csv")
+    
+    train_df.to_csv(train_path, index = False)
+    test_df.to_csv(test_path, index = False)
     
     #save original class weights
     # save class_weights.json
     positive, negative, positive_weight = calculate_class_ratio(y_train)
     
-    
-    with open("data/processed/class_weights.json", mode = "w") as file:
+    weights_path = os.path.join(PROCESSED_DIR, "class_weights.json")
+    with open(weights_path, mode = "w") as file:
         json.dump({
             "positive":int(positive)
             ,"negative":int(negative)
@@ -166,16 +212,18 @@ def save_processed_data():
             ,indent = 4)
     
     # save train_smote.csv
-    smote_X, smote_y = SMOTE(random_state=42).fit_resample(X_train, y_train)
+    smote_X, smote_y = SMOTE(random_state=42).fit_resample(X_train_encoded, y_train)
     smote_df = pd.DataFrame(smote_X, columns = X_train.columns)
     smote_df['target'] = smote_y 
-    smote_df.to_csv("data/processed/train_smote.csv", index = False)   
+    smote_path = os.path.join(PROCESSED_DIR, "train_smote.csv")
+    smote_df.to_csv(smote_path, index = False)   
         
         # save undersampled csv
-    undersampled_X, undersampled_y = RandomUnderSampler(random_state = 42).fit_resample(X_train, y_train)
+    undersampled_X, undersampled_y = RandomUnderSampler(random_state = 42).fit_resample(X_train_encoded, y_train)
     undersampled_df = pd.DataFrame(undersampled_X, columns = X_train.columns)
     undersampled_df['target'] = undersampled_y
-    undersampled_df.to_csv("data/processed/train_undersampled.csv", index = False)
+    undersampled_path = os.path.join(PROCESSED_DIR, "train_undersampled.csv")
+    undersampled_df.to_csv(undersampled_path, index = False)
     print("Islenmis veriler basariyla kaydediliyor...")
     
     
@@ -187,6 +235,7 @@ def save_processed_data():
         "train_undersampled": "data/processed/train_undersampled.csv",
         "class_weights": "data/processed/class_weights.json"
     }
+"""
 #%% call main function (ana fonksiyonu cagir)
 if __name__ == '__main__':
     X_train, X_test, y_train, y_test, preprocessor = get_split_data()

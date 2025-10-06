@@ -41,10 +41,12 @@ Ilgili dosyalari kaydet: artifacts isminde bir klasor olustur ve icerisine model
 ozellik isimlerini kaydet.
 """
 # ARTIFACTS_DIR = 'artifacts'
-
+# BASE_DIR = os.path.dirname(os.path.ab(__file__))  # loan_data_analysis dizini
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ARTIFACTS_DIR = os.path.join(BASE_DIR, "artifacts")
 #%% create artifacts directory if not exists (artifacts klasoru yoksa olustur)
 def ensure_artifacts_dir():
-    artifacts_dir = 'artifacts'
+    artifacts_dir = ARTIFACTS_DIR
     os.makedirs(artifacts_dir, exist_ok=True)
     return artifacts_dir
 
@@ -82,10 +84,43 @@ def evaluate_and_print_model(title:str, y_test:np.ndarray, y_pred:np.ndarray, y_
     # for returning values (degerleri dondurmek icin)
     return {
         "classification_report":report,
-        "confusion_matrix":conf_matrix,
+        "confusion_matrix":conf_matrix.tolist(),
         "roc_auc":auc
     }
 
+
+def train_and_evaluate_models(X_train, X_test, y_train, y_test, tag):
+    
+    results = {}
+    y_train = np.ravel(y_train)
+    y_test = np.ravel(y_test)
+    models = {
+        "LogisticRegression": LogisticRegression(class_weight='balanced', max_iter=1500)
+        ,"RandomForest": RandomForestClassifier(class_weight='balanced'
+                                                ,n_estimators=150
+                                                ,random_state=42 
+                                                ,max_depth=10
+                                                ,min_samples_split=5
+                                                )
+        ,"XGBoost": XGBClassifier(
+            n_estimators=150
+            ,random_state=42
+            ,max_depth=5,
+            learning_rate=0.05
+            ,subsample=0.8
+            ,colsample_bytree=0.8,
+            reg_lambda=1
+            ,eval_metric='logloss'
+            ,scale_pos_weight=calculate_class_ratio(y_train)[2]
+        )
+    }
+    for name, model in models.items():
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_test)
+        y_proba = model.predict_proba(X_test)# [:, 1]
+        results[name] = evaluate_and_print_model(f"{name} ({tag})", y_test, y_pred, y_proba)
+        joblib.dump(model, os.path.join(ARTIFACTS_DIR, f"model_{name.lower()}_{tag}.pkl"))
+    return results
 
 #%% train with different models and resampling techniques (farkli modeller ve yeniden ornekleme teknikleri ile egit)
 
@@ -96,16 +131,32 @@ def scenario_no_resampling(save_tag = '_cw'):
     artifacts_dir = ensure_artifacts_dir()
     X_train, X_test, y_train, y_test, pre = get_split_data()
     
+    # must be one dimension (hedef degisken tek boyutlu olmali)
+    
+    y_train = np.ravel(y_train.values) if hasattr(y_train, "values") else np.ravel(y_train)
+    y_test = np.ravel(y_test.values) if hasattr(y_test, "values") else np.ravel(y_test)
+    
+    pre.fit(X_train)
+    X_train_transformed = pre.transform(X_train)
+    X_test_transformed = pre.transform(X_test)
+    
     # save feature names (ozellik isimlerini kaydet)
-    with open(f'{artifacts_dir}/feature_schema.json',"w") as file:
+    with open(os.path.join(ARTIFACTS_DIR, f'feature_schema{save_tag}.json'), "w") as file:
         json.dump({"columns": list(X_train.columns)}, file, indent = 4)
     
+    joblib.dump(
+        pre
+        ,os.path.join(ARTIFACTS_DIR,f"preprocessor{save_tag}.pkl")
+    )
+    return train_and_evaluate_models(X_train_transformed, X_test_transformed, y_train, y_test, save_tag)
     
+        
+""" 
     # 1- Apply preprocessor =>  Logistic Regression with class_weight = 'balanced'
     log_reg = Pipeline(steps = [
         ("pre",pre),
         ('clf',LogisticRegression(class_weight = 'balanced'
-                                  ,max_iter = 15000))
+                                  ,max_iter = 1500))
     ]
         
     )
@@ -121,10 +172,10 @@ def scenario_no_resampling(save_tag = '_cw'):
     # save model and preprocessor (modeli ve on isleyiciyi kaydet)
     
     joblib.dump(log_reg,
-                f"{artifacts_dir}/model_log_reg{save_tag}.pkl")
-    
+                os.path.join(ARTIFACTS_DIR,f"model_log_reg{save_tag}.pkl"))
+
     joblib.dump(pre,
-                f"{artifacts_dir}/preprocessor_log_reg{save_tag}.pkl")    
+                os.path.join(ARTIFACTS_DIR, f"preprocessor_log_reg{save_tag}.pkl"))
     
 
 # 2 - Apply preprocessor => Random Forest with class_weight = 'balanced'
@@ -151,10 +202,10 @@ def scenario_no_resampling(save_tag = '_cw'):
     # save model and preprocessor (modeli ve on isleyiciyi kaydet)
     
     joblib.dump(rf_clf,
-                f"{artifacts_dir}/model_rf{save_tag}.pkl")
+                os.path.join(ARTIFACTS_DIR,f"model_rf{save_tag}.pkl"))
     
     joblib.dump(pre,
-                f"{artifacts_dir}/preprocessor_rf{save_tag}.pkl") 
+                os.path.join(ARTIFACTS_DIR,f"preprocessor_rf{save_tag}.pkl")) 
     
     
     # 3 - Apply preprocessor => XGBoost with scale_pos_weight
@@ -163,9 +214,9 @@ def scenario_no_resampling(save_tag = '_cw'):
     xgb = Pipeline(steps = [
         ("pre", pre),
         ("clf", XGBClassifier(
-            n_estimators = 500
+            n_estimators = 150
             ,random_state = 42
-            ,max_depth = 7
+            ,max_depth = 5
             ,learning_rate = 0.05
             ,subsample = 0.8
             ,colsample_bytree = 0.8
@@ -186,16 +237,16 @@ def scenario_no_resampling(save_tag = '_cw'):
     
     # save model and preprocessor (modeli ve on isleyiciyi kaydet)
     joblib.dump(xgb,
-                f"{artifacts_dir}/model_xgb{save_tag}.pkl")
+                os.path.join(ARTIFACTS_DIR,f"model_xgb{save_tag}.pkl"))
     joblib.dump(pre,
-                f"{artifacts_dir}/preprocessor_xgb{save_tag}.pkl")
+                os.path.join(ARTIFACTS_DIR,f"preprocessor_xgb{save_tag}.pkl"))
     
     return {
         "log_reg": log_reg_results,
         "random_forest": rf_clf_results,
         "xgboost": xgb_results
     }
-
+"""
 
 #%% define scenario_with_sampler()
 # Veri dengesizligini onlemek icin Resampling gerceklestirelim.
@@ -209,9 +260,11 @@ def scenario_with_sampler(sampler, tag, return_results: bool = True):
     artifacts_dir = ensure_artifacts_dir()
     
     X_train, X_test, y_train, y_test, pre = get_split_data()
+    # must be 1d
+    y_train = np.ravel(y_train.values) if hasattr(y_train, "values") else np.ravel(y_train)
+    y_test = np.ravel(y_test.values) if hasattr(y_test, "values") else np.ravel(y_test)
     
-    
-    with open(f"{artifacts_dir}/feature_schema_{tag}.json", mode= "w") as file:
+    with open(os.path.join(ARTIFACTS_DIR, f"feature_schema_{tag}.json"), mode= "w") as file:
         json.dump(
         {"columns": list(X_train.columns)}
         ,fp = file
@@ -219,10 +272,21 @@ def scenario_with_sampler(sampler, tag, return_results: bool = True):
     
     # Not: fit_transform sadece X_train'de uygulanir.
     # X_test'de sadece fit() uygulanir. Bu veri sizintisini onlemektedir.
-    X_train_transformed = pre.fit_transform(X_train)
-    X_transformed_resampled, y_resampled = sampler.fit_resample(X_train_transformed, y_train)
-  
     
+    pre.fit(X_train)
+    X_train_transformed = pre.transform(X_train)
+    X_test_transformed = pre.transform(X_test)
+    X_transformed_resampled, y_resampled = sampler.fit_resample(X_train_transformed, y_train)
+    y_resampled = np.ravel(y_resampled)
+    
+    with open(os.path.join(ARTIFACTS_DIR, f'feature_schema_{tag}.json'), mode = "w") as file:
+        json.dump(
+            {"columns": list(X_train.columns)}
+            ,file
+            ,indent = 4)
+    return train_and_evaluate_models(X_transformed_resampled, X_test_transformed, y_resampled, y_test, tag)
+""" 
+    # Daha moduler hale getirelim. Veri sizintisini engelleyelim
     # 1-build a Logistic Regression model (Lojistik regresyon modelini olustur)
     log_reg = LogisticRegression(
         max_iter = 1500
@@ -267,7 +331,7 @@ def scenario_with_sampler(sampler, tag, return_results: bool = True):
     xgb = XGBClassifier(
         n_estimators = 500
         ,random_state = 42
-        ,max_depth = 7
+        ,max_depth = 5
         ,learning_rate = 0.05
         ,subsample = 0.8
         ,colsample_bytree = 0.8
@@ -288,16 +352,16 @@ def scenario_with_sampler(sampler, tag, return_results: bool = True):
     
     # save all models
     joblib.dump(pre, 
-                f"{artifacts_dir}/preprocessor_{tag}.pkl")
+                os.path.join(ARTIFACTS_DIR,f"preprocessor_{tag}.pkl"))
     
     joblib.dump(log_reg,
-                f"{artifacts_dir}/model_log_reg_{tag}.pkl")
+                os.path.join(ARTIFACTS_DIR, f"model_log_reg_{tag}.pkl"))
     
     joblib.dump(rf,
-                f"{artifacts_dir}/model_rf_{tag}.pkl")
+                 os.path.join(ARTIFACTS_DIR,f"model_rf_{tag}.pkl"))
     
     joblib.dump(xgb,
-                f"{artifacts_dir}/model_xgb_{tag}.pkl")
+                 os.path.join(ARTIFACTS_DIR,f"model_xgb_{tag}.pkl"))
     
     if return_results:
         return {
@@ -308,6 +372,7 @@ def scenario_with_sampler(sampler, tag, return_results: bool = True):
                 ,"xgb":xgb_result
         }
         }
+    """
 
 def main():
     """main fonksiyonunda bu fonksiyonlari cagiralim. Herhangi bir ornekleme olmayan versiyonu cagir
@@ -332,7 +397,7 @@ def main():
     )
     
 
-def save_metrics(metrics_dictionary, file_path = 'artifacts/metrics.json'):
+def save_metrics(metrics_dictionary, file_path = os.path.join(ARTIFACTS_DIR, "metrics.json") ):#'loan_data_analysis/artifacts/metrics.json'):
     """Model performansini daha iyi degerlendirebilmek amaciyla metrik degerlerini kaydeder """
     os.makedirs(os.path.dirname(file_path), exist_ok= True)
     with open(file_path, mode = "w") as file:
@@ -343,6 +408,7 @@ def save_metrics(metrics_dictionary, file_path = 'artifacts/metrics.json'):
     
 if __name__ == '__main__':
     # main()
+    ensure_artifacts_dir()
     result_cw =scenario_no_resampling(save_tag = "_cw")
     result_undersampler = scenario_with_sampler(
         sampler = RandomUnderSampler(random_state=42)
@@ -359,3 +425,4 @@ if __name__ == '__main__':
         ,"smote": result_smote
     }
     save_metrics(all_metrics)
+

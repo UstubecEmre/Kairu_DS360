@@ -1,0 +1,21 @@
+# Add patterns of files dvc should ignore, which could improve
+# the performance. Learn more at
+# https://dvc.org/doc/user-guide/dvcignore
+# ======================
+# GENERAL / SYSTEM FILES
+# ======================
+# ===============================
+#   DVC Ignore Configuration
+# ===============================
+
+# Python cache & virtual envs
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.env/
+.venv/
+venv/
+env/
+.ipynb_checkpoints/

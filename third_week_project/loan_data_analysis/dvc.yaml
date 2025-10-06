@@ -1,0 +1,57 @@
+stages:
+  data_loader:
+    cmd: python src/data_loader.py
+    deps:
+      - src/data_loader.py
+    outs:
+      - data/raw/loan_data.csv
+
+  eda:
+    cmd: python src/eda.py
+    deps:
+      - src/eda.py
+      - data/raw/loan_data.csv
+
+  preprocessing:
+    cmd: python src/preprocessing.py
+    deps:
+      - src/preprocessing.py
+      - data/raw/loan_data.csv
+    outs:
+      - data/processed/train_original.csv
+      - data/processed/test_original.csv
+      - data/processed/class_weights.json
+      - data/processed/train_smote.csv
+      - data/processed/train_undersampled.csv
+
+  train:
+    cmd: python src/train.py
+    deps:
+      - src/train.py
+      - src/preprocessing.py
+      - data/processed/train_original.csv
+      - data/processed/test_original.csv
+    outs:
+      # NO RESAMPLING (_cw) Senaryosu Çıktıları
+      - artifacts/model_logisticregression__cw.pkl
+      - artifacts/model_randomforest__cw.pkl
+      - artifacts/model_xgboost__cw.pkl
+      - artifacts/preprocessor_cw.pkl # Tek bir preprocessor kaydediliyor.
+
+      # UNDERSAMPLING (_under) Senaryosu Çıktıları
+      - artifacts/model_logisticregression_under.pkl
+      - artifacts/model_randomforest_under.pkl
+      - artifacts/model_xgboost_under.pkl
+
+      # SMOTE (_smote) Senaryosu Çıktıları
+      - artifacts/model_logisticregression_smote.pkl
+      - artifacts/model_randomforest_smote.pkl
+      - artifacts/model_xgboost_smote.pkl
+
+      # Feature Schemas (Aynı yerlerde kaydedilmeli)
+      - artifacts/feature_schema_cw.json
+      - artifacts/feature_schema_under.json
+      - artifacts/feature_schema_smote.json
+
+    metrics:
+      - artifacts/metrics.json
