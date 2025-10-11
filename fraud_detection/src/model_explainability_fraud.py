@@ -121,5 +121,21 @@ class SimpleModelExplainer:
             return None, X_test
     
     
+    def plot_shap_summary(self, X_test = None):
+        if not SHAP_AVAILABLE or self.shap_values is None:
+            logger.warning("SHAP Modulu veya Aciklamasi Bulunmamaktadir")
+            return False 
+        
+        plt.figure(figsize = (12, 8))
+        shap.summary_plot(
+            self.shap_values
+            ,X_test
+            ,feature_names = self.feature_names
+            ,plot_type = 'bar'
+            ,show = False
+        )
+        plt.title("SHAP ile Degiskenlerin Onemlilik Derecesi (Feature Importances With SHAP)")
+        plt.tight_layout()
+        plt.show()
+        return True 
     
-         
