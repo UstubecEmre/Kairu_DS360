@@ -18,6 +18,9 @@ from sklearn.ensemble import RandomForestClassifier
 
 # feature importances
 from sklearn.inspection import permutation_importance
+from download_data import load_data
+
+fraud_df = load_data()
 
 #%% ensure shap and lime import
 """
@@ -85,6 +88,7 @@ class SimpleModelExplainer:
     
     # define a method
     def initialize_shap(self, explainer_type = 'tree'):
+        """ Agac tabanli model kullanarak SHAP dahil eder"""
         # ensure_shap_imported()
         if not SHAP_AVAILABLE:
             logger.warning("SHAP Modulu Import Edilmemis")
@@ -107,6 +111,7 @@ class SimpleModelExplainer:
             
     
     def compute_shap_values(self, X_test, max_samples = 100):
+        """SHAP degerini hesaplar"""
         if not SHAP_AVAILABLE or self.shap_explainer is None:
             logger.warning("Kullanilabilir SHAP Modulu ve Aciklayicisi Bulunamadi")
             return None, X_test
@@ -139,3 +144,76 @@ class SimpleModelExplainer:
         plt.show()
         return True 
     
+    def show_feature_importances(self, X_test, y_test):
+        """ Permutaion Features kullanilarak degiskenlerin onem dereceleri belirlenir"""
+        
+        try:
+            perm_importance = permutation_importance(
+                estimator= self.model
+                ,X = X_test
+                ,y = y_test
+                ,random_state= 42
+                ,n_repeats = 5
+                ,n_jobs= -1
+            )
+            # en onemli 10 ozelligi siralayip, gorsellestirelim
+            sorted_indexes = np.argsort(perm_importance.importances_mean)[-10:]
+            plt.figure(figsize = (12, 8))
+            sns.barplot(
+                y = [self.feature_names[i] for i in sorted_indexes]
+                ,x = perm_importance.importances_mean[sorted_indexes]
+                ,palette ="RdGn")
+            plt.title("Feature Importance (Degiskenlerin Onem Derecesi)")
+            plt.xlabel("Permutation Importance (Permutasyon Onem Derecesi)")
+            plt.tight_layout()
+            plt.show()
+            
+            return perm_importance
+        except Exception as err:
+            logger.error(f"Permutation Importance Error (Permutasyon Onem Hatasi): {err}")
+            return None 
+        
+        
+        
+def demo_explainability():
+    """ RandomForestClassifier modeli kullanilarak degiskenlerin onem derecesini belirler ve model aciklanabilirligi saglar """
+    from sklearn.model_selection import train_test_split
+    # from sklearn.datasets import make_classification
+        
+    logger.info("Model Aciklanabilirligi Basliyor...")
+        
+    X = fraud_df.drop('Class', axis = 1)
+    y = fraud_df['Class']
+        
+    X_train, X_test, y_train, y_test = train_test_split(
+            X,
+            y,
+            test_size= 0.2
+            ,random_state = 42
+            ,stratify = y
+        )
+    model = RandomForestClassifier(n_estimators = 100 ,random_state= 42)
+    model.fit(X_train, y_train)
+    print(f"Model Dogruluk Degeri: {model.score(X_test, y_test):.4f}")
+        
+        
+        # Explainer olustur
+    explainer = SimpleModelExplainer(
+            model, X_train
+        )
+    
+    if explainer.initialize_shap():
+        shap_values, X_test = explainer.compute_shap_values(X_test, max_samples = 1000)
+        if shap_values is not None:
+            explainer.plot_shap_summary(X_test)
+            
+    # explainer.show_feature_importances(X_test, y_test)
+    explainer.show_feature_importances(X, y) # tum veri seti icin
+    print("Model Aciklanabilirligi Tamamlandi...")
+    return explainer
+
+
+#%% ana fonksiyonda cagir
+
+if __name__ == '__main__':
+    demo_explainability()
