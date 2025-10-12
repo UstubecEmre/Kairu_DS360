@@ -159,6 +159,8 @@ class Feature_Preprocessor:
                 return {} 
         return outlier_info
     
+    
+    
     def extract_new_features(self, dataframe: pd.DataFrame)->pd.DataFrame:
         """Ozellik muhendisligi gerceklestirir, yeni ozellikler turetir
         Args:
@@ -186,11 +188,102 @@ class Feature_Preprocessor:
         if hasattr(self, 'numerical_features') and len(self.numerical_features) >= 2:
             feature_1, feature_2 = self.numerical_features[:2] # 0 ve 1. index degerleri sirasiyla ilgili degiskenlere atanir
             df_featured[feature_2] = pd.to_numeric(df_featured[feature_2], errors='coerce')
-
+            # sifira bolum hatasini engelle 
             df_featured[f'{feature_1}_{feature_2}_ratio'] = df_featured[feature_1] / df_featured[feature_2].replace(0, np.nan)
             df_featured[f'{feature_1}_{feature_2}_multiplied'] = df_featured[feature_1] * df_featured[feature_2]
         
         logger.info("Ozellik Muhendisligi Gerceklestirildi")
         return df_featured
+    
+    def fit_transform_model(self, dataframe:pd.DataFrame, target_col:str=None):
+        """Modeli egitir ve donusturur.
         
+        Args:
+            dataframe (pd.DataFrame): Girdi DataFrame'i
+            target_col (str, optional): Hedef degisken. Defaults to None.
+
+        Returns:
+            processed_df (pd.DataFrame): Ozellik muhendisligi, olcekleme ve kategorik degiskenlerin sayisala donusumu gerceklestirilmis DataFrame
+            target (str): Hedef degisken ismi
+        """
+        
+        df_processed = dataframe.copy()
+        
+        # Hedef degisken y olarak atanmali, X'de yer almamali
+        if isinstance(target_col, str) and target_col in df_processed:
+            target = df_processed[target_col]
+            df_processed = df_processed.drop(columns = [target_col])         
+        else:
+            target = None
+        # Veri tiplerini belirle
+        self.identify_real_data_types(df_processed)
             
+        # Eksik degerleri doldur (impute)
+        df_processed = self.handle_missing_values(df_processed)
+            
+        # Ozellik muhendisligi gerceklestir
+        df_processed = self.extract_new_features(df_processed)
+            
+        # Yeni degerlerin veri tipini belirle
+        self.identify_real_data_types(df_processed)
+            
+        # Sayisal degiskenleri olceklendir; kategorikleri sayisala cevir
+        if hasattr(self, 'numerical_features') and self.numerical_features:
+            try:
+                df_processed[self.numerical_features] = self.scaler.fit_transform(
+                    df_processed[self.numerical_features]
+                )
+                logger.info(f"Kullanilan Olceklendirme Yontemi: {self.scaling_method}")
+            except Exception as err:
+                logger.error(f"Beklenmedik Bir Hata Olustu. Sayisal Degiskenler Olceklendirilemedi: {err}")
+        
+        # Kategorik degiskenleri sayisala donustur    
+        if hasattr(self, 'categorical_features') and self.categorical_features:
+            try:
+                if isinstance(self.encoding_method, str) and self.encoding_method == 'onehot':
+                    encoded_data = self.encoder.fit_transform(
+                        df_processed[self.categorical_features]
+                    )
+                        
+                    # degisken isimlerini alalim 
+                    if hasattr(self.encoder, 'get_feature_names_out'):
+                        self.encoded_feature_names = self.encoder.get_feature_names_out(
+                            self.categorical_features
+                        ).tolist()
+                    else:
+                        self.encoded_feature_names = [
+                            f"{cat}_{val}" for cat in self.categorical_features
+                            for val in self.encoder.categories_[
+                                self.categorical_features.index(cat)
+                            ]
+                        ]
+                            
+                # Sayisala donusturulmus bir DataFrame olustur
+                    encoded_df = pd.DataFrame(
+                        encoded_data,
+                        columns = self.encoded_feature_names,
+                        index = df_processed.index
+                        )
+                        
+                    df_processed = df_processed.drop(columns= self.categorical_features)
+                    df_processed = pd.concat([df_processed, encoded_df], axis = 1)
+                else:
+                     for col in self.categorical_features:
+                         df_processed[col] = self.encoder.fit_transform(
+                             df_processed[col]
+                         )   
+            except Exception as err:
+                logger.error(f"Beklenmeyen Bir Hata Olustu. Encoding Islemi Gerceklestirilemedi: {err}")
+            
+            
+        self.is_fitted = True 
+            
+        # hedef degiskeni ekle
+        if target_col:
+            df_processed[target_col] = target
+                
+        return df_processed, target 
+
+
+
+    
