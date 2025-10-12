@@ -285,5 +285,76 @@ class Feature_Preprocessor:
         return df_processed, target 
 
 
+    def transform_model(self, dataframe: pd.DataFrame, target_col:str=None):
+        """Egitilmis model uzerinde donusturme islemleri gerceklestirir
 
+        Args:
+            dataframe (pd.DataFrame): _
+            target_col (str, optional): Hedef degisken. Defaults to None.
+
+        Raises:
+            ValueError: Uygun veri tipi kullanilmamasi durumunda deger hatasi dondurur
+
+        Returns:
+            processed_df (pd.DataFrame): Transform edilmis DataFrame'i dondurur.
+            target (str): Hedef degikeni dondurur
+        """
+        if not self.is_fitted:
+            raise ValueError("Fit Transform Uygulamadan Sadece Transform Calistiramazsiniz!!!")
+        
+        df_processed = dataframe.copy()
+        target = None 
+        if isinstance(target_col, str) and target_col in df_processed.columns:
+            target = df_processed[target_col]
+            df_processed = df_processed.drop(columns= [target_col])
     
+        # Eksik deger varsa doldur
+        df_processed = self.handle_missing_values(df_processed)
+        
+        # Oznitelik uret
+        df_processed = self.extract_new_features(df_processed)
+        
+        # scaling and encoding
+        if hasattr(self, "numerical_features") and self.numerical_features:
+            try:
+                # var olan degerleri donustur
+                existing_numerical_features = [num_feat for num_feat in self.numerical_features if num_feat in df_processed.columns]
+            
+                if existing_numerical_features:
+                    df_processed[existing_numerical_features] = self.scaler.transform(
+                        df_processed[existing_numerical_features]
+                    )
+            except Exception as err:
+                logger.error(f"Beklenmeyen Bir Hata Olustu: {err}")
+        
+        if hasattr(self, "categorical_features") and self.categorical_features:
+            try:
+                existing_categorical_features = [cat_feat for cat_feat in self.categorical_features
+                                                 if cat_feat in df_processed.columns]
+                
+                if existing_categorical_features and self.encoding_method == 'onehot':
+                   encoded_data = self.encoder.transform(
+                        df_processed[existing_categorical_features]
+                    )
+                   encoded_df = pd.DataFrame(
+                       encoded_data
+                       ,columns = self.encoded_feature_names
+                       ,index = df_processed.index
+                        
+                   )   
+                   df_processed = df_processed.drop(columns = existing_categorical_features)
+                   df_processed = pd.concat([df_processed, encoded_df], axis = 1) 
+                
+                elif existing_categorical_features:
+                    for cat_col in existing_categorical_features:
+                        df_processed[cat_col] = self.encoder.transform(df_processed[cat_col])
+                
+                else:
+                    logger.warning("Gecersiz Bir Islem Gerceklestirdiniz")
+            except Exception as err:
+                logger.error(f"Beklenmeyen Bir Hata Olustu: {err}")
+                
+        if target_col and target is not None:
+            df_processed[target_col] = target
+            
+        return df_processed, target
