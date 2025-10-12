@@ -75,3 +75,41 @@ class Feature_Preprocessor:
         logger.info(f"Kategorik Degisken Sayisi: {len(self.categorical_features)}")
         logger.info(f"Sayisal Degisken Sayisi: {len(self.numerical_features)}")
         
+    def handle_missing_values(self, 
+                              dataframe:pd.DataFrame,
+                              numerical_strategy: str = 'median',
+                              categorical_strategy: str = 'most_frequent') -> pd.DataFrame:
+        
+        self.dataframe = dataframe.copy() 
+        df_processed = dataframe.copy()
+        
+        
+        # build a Pipeline => ColumnTransformer
+        
+        # for numerical missing values (eksik sayisal degerler icin doldurma)
+        if hasattr(self, 'numerical_features') and self.numerical_features:
+            try:
+                num_imputer = SimpleImputer(strategy = numerical_strategy)
+                df_processed[self.numerical_features] = num_imputer.fit_transform(
+                    df_processed[self.numerical_features]
+                )
+            except Exception as err:
+                logger.error(f"Beklenmeyen Bir Hata Olustu. Sayisal Degiskenler Doldurulamadi: {err}")
+                return False 
+        
+        # to fill for categorical features (kategorik degiskenleri doldurmak icin)
+        if hasattr(self, 'categorical_features') and self.categorical_features:    
+            try:
+                cat_imputer = SimpleImputer(strategy= categorical_strategy)
+                df_processed[self.categorical_features] = cat_imputer.fit_transform(
+                    df_processed[self.categorical_features]
+                )
+            except Exception as err:
+                logger.error("Sayisal Degiskenler Medyan Degerleriyle; Kategorik Degiskenler Mod Ile Dolduruldu")
+                return False
+        logger.info(f"Sayisal Degiskenler {numerical_strategy} ile dolduruldu")
+        logger.info(f"Kategorik Degiskenler {categorical_strategy} ile dolduruldu")
+        
+        return df_processed
+    
+# %%
