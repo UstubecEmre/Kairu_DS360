@@ -112,4 +112,50 @@ class Feature_Preprocessor:
         
         return df_processed
     
-# %%
+    def detect_outlier_values(self, 
+                              dataframe: pd.DataFrame,
+                              method: str =  'iqr', 
+                              threshold: float = 1.5) -> dict:
+        """Aykiri degerleri tespit eder. IQR ve ZScore yontemleri kullanilir. 
+        Args:
+            df (pd.DataFrame): Giris DataFrame'i 
+            method: Aykiri deger tespiti icin kullanilacak yontem (iqr, zscore)
+            threshold (float): Esik degeri
+        
+        Returns:
+            outlier_info (dict)
+        """
+        outlier_info = {}
+        self.dataframe = dataframe.copy()
+        
+        if hasattr(self, 'numerical_features') and self.numerical_features:
+            try:
+                for col in self.numerical_features:
+                    if method == 'îqr':
+                        Q1 = dataframe[col].quantile(0.25)
+                        Q3 = dataframe[col].quantile(0.75)
+                        IQR = Q3 - Q1 
+                        upper_bound = Q3 + threshold * IQR 
+                        lower_bound = Q1 - threshold * IQR 
+                        
+                        outliers = dataframe[(dataframe[col] > upper_bound) | (dataframe[col] < lower_bound)]
+                        outlier_info[col] = {
+                            "count": len(outliers)
+                            ,"upper_bound": upper_bound
+                            ,"lower_bound": lower_bound
+                            ,"percentage": (len(outliers) / len(dataframe)) * 100
+                        }
+                    elif method == "zscore":
+                        """Sutunun ortalama degerini cikar ve standart sapmaya bol"""
+                        z_scores = np.abs((dataframe[col] - dataframe[col].mean()) / dataframe[col].std())
+                        outliers = dataframe[z_scores > threshold]
+                        outlier_info[col] = {
+                            "count": len(outliers)
+                            ,"threshold": threshold
+                            ,"percentage": (len(outliers) / len(dataframe)) * 100
+                        }
+            except Exception as err:
+                logger.error(f"Beklenmedik Hata Olustu: {err}")
+                return {} 
+        return outlier_info
+            
