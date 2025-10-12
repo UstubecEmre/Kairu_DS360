@@ -413,11 +413,21 @@ class ImbalanceHandler:
     @staticmethod
     def find_target_class_ratio(y, target_cols = None):
         unique_val, nunique_val = np.unique(y, return_counts=True)
+        
+        if len(nunique_val) == 0:
+            logger.warning("Hedef Degisken Bos!!! Dengesizlik Orani Hesaplanamadi")
+            return False 
+        
         print("Sinif Dagilimi")
         for idx, (cls, count) in enumerate(zip(unique_val, nunique_val)):
-            col = target_cols[idx] if target_cols else f"Class {cls}"
+            
+            if target_cols and idx < len(target_cols):
+                col = target_cols[idx]
+            else:
+                col = f"class {cls}"
+            
             percentage = (count / len(y)) * 100
-            print(f"{col} sutunu: {nunique_val} Orani: {percentage:.4f}%")
+            print(f"{col} sutunu: {count} Orani: {percentage:.4f}%")
         
         # dengesizlik orani
         imbalance_ratio = max(nunique_val) / min(nunique_val)
@@ -425,6 +435,11 @@ class ImbalanceHandler:
 
         # gorsellestirme notebooks icerisinde var. Dilerseniz buraya da ekleyebilirsiniz
         
+        result_dict = {
+            "class_counts": dict(zip(unique_val, nunique_val))
+            ,"imbalance_ratio": imbalance_ratio
+        }
+        return result_dict 
         
         
     @staticmethod
@@ -448,4 +463,147 @@ class ImbalanceHandler:
         X_resampled, y_resampled = smotemek.fit_resample(X,y)
         logger.info(f"SMOTETomek Methodu Uygulandi: {len(X)} -> {len(X_resampled)}")
         return X_resampled, y_resampled
+
+
+def demo_preprocessing(data_path =Path(r"D:\Kairu_DS360_Projects\fourth_week_project\fraud_detection\data\anomaly_scores_raw.csv")):
+    """Islenmis egitim ve test veri setini kaydeder, opsiyonel olarak dengesiz veri setini dengeli hale getirir """
+    try:
+        fraud_df = pd.read_csv(data_path)
+        print(fraud_df.head())
+        assert "Class" in fraud_df.columns, "Hedef Degisken 'Class' Bulunamadi"
+    except FileNotFoundError:
+        raise FileNotFoundError("Dosya Yolu Bulunamadi")
+    except Exception as err:
+        logger.error(f"Beklenmeyen Bir Hata Olustu: {err}")
         
+    print("Ham Veri Seti Bilgileri:\n")
+    fraud_df.info()
+    
+    
+    # Dengesiz Veri Seti mi?
+    print("Veri Seti Hedef Degisken ('Class') Dagilimi")
+    ImbalanceHandler.find_target_class_ratio(fraud_df['Class'], ['Normal','Fraud'])
+    
+    
+    # Veri egitim ve test diye ayrilmis mi?
+    if 'split' in fraud_df.columns:
+        # split varsa
+        feature_cols = [col for col in fraud_df.columns if col not in('Class', 'split')]
+        train_fraud_df = fraud_df[fraud_df["split"] == 'train'].reset_index(drop = True)
+        test_fraud_df = fraud_df[fraud_df['split'] == 'test'].reset_index(drop = True)
+        
+        
+        X_train = train_fraud_df[feature_cols].copy()
+        y_train = train_fraud_df['Class'].astype(int).copy()
+        
+        X_test = test_fraud_df[feature_cols].copy()
+        y_test = test_fraud_df['Class'].astype(int).copy()
+    # split sutunu yoksa
+    else:
+        X = fraud_df.drop(columns = ['Class'], errors = 'ignore')
+        y = fraud_df['Class'].astype(int)
+        
+        X_train, X_test, y_train, y_test = train_test_split(X, y, random_state = 42, stratify= y)
+        
+    # encoding ve scaling uygula, modeli egitime hazir hale getir
+    preprocessor = Feature_Preprocessor(scaling_method= 'robust', encoding_method= 'onehot')
+    
+    # X_train_processed
+    X_train_processed = preprocessor.fit_transform_model(
+        pd.concat([X_train, y_train.rename('Class')], axis = 1), target_col = "Class"
+    )
+    y_train_processed = X_train_processed['Class'].astype(int)
+    X_train_processed = X_train_processed.drop('Class', axis=1)
+    
+    # transform 
+    X_test_processed = preprocessor.transform_model(
+        pd.concat([X_test,  y_test.rename('Class')], axis = 1)
+        ,target_col = 'Class'
+    )
+    y_test_processed = X_test_processed['Class'].astype(int)
+    X_test_processed = X_test_processed.drop(columns = 'Class', axis = 1)
+    
+    print(f"Islenmis Veri Setinin Egitim Seti Boyutu: {X_train_processed.shape}")
+    print(f"Islenmis Veri Setinin Test Seti Boyutu: {X_test_processed.shape}")
+    
+    
+    # Dengesiz veriyi dengeli hale getirelim
+    try:
+        X_train_balanced,  y_train_balanced = ImbalanceHandler.apply_smote(
+            X_train_processed
+            ,y_train_processed
+        )
+    except Exception as err:
+        logger.warning(f"Sentetik Veri Uretiminde Beklenmeyen Bir Hata Olustu: {err}")
+        X_train_balanced, y_train_balanced = X_train_processed, y_train_processed
+        
+    # Dosyalari kaydedelim
+    from pathlib import Path
+    DATA_DIRECTORY = Path("./data/processed")
+    DATA_DIRECTORY.mkdir(parents = True, exist_ok= True)
+    # dosya yollarini belirt
+    fraud_train_out = DATA_DIRECTORY / "train_processed_supervised.csv"
+    fraud_test_out  = DATA_DIRECTORY / "test_processed_supervised.csv"
+    fraud_full_out  = DATA_DIRECTORY / "dataset_processed_supervised.csv"
+    
+    # fraud_train_out csv formatinda kaydet
+    pd.concat([X_train_processed.reset_index(drop = True), y_train_processed.reset_index(drop = True)], axis = 1).to_csv(fraud_train_out, index = False)
+    
+    # fraud_test_out csv formatinda kaydet
+    pd.concat([X_test_processed.reset_index(drop = True), y_test_processed.reset_index(drop = True)], axis = 1).to_csv(fraud_test_out, index = False)
+    
+    # split etiketi varsa:
+    if 'split' in fraud_df.columns:
+        train_merge = pd.concat([
+            X_train_processed.reset_index(drop = True)
+            ,y_train_processed.reset_index(drop = True)
+            ,pd.Series(['train'] * len(y_train_processed), name = 'split')
+        ]
+        ,axis = 1)
+        
+        test_merge = pd.concat([
+            X_test_processed.reset_index(drop = True)
+            ,y_test_processed.reset_index(drop = True)
+            ,pd.Series(['test'] * len(y_test_processed), name = 'split')
+        ]
+        ,axis = 1)
+        
+        
+        full_fraud_df = pd.concat([train_merge, test_merge], axis = 0, ignore_index= True)
+    
+    else:
+        full_fraud_df = pd.concat(
+            [
+                pd.concat([
+                    X_train_processed.reset_index(drop = True)
+                    ,y_train_processed.reset_index(drop = True)
+                ],axis = 1)
+                
+                ,pd.concat([
+                    X_test_processed.reset_index(drop = True)
+                    ,y_test_processed.reset_index(drop = True)
+                ], axis = 1)
+            ]
+            ,axis = 0
+            ,ignore_index= True
+        )
+    # full_fraud_df csv formatinda kaydet
+    full_fraud_df.to_csv(fraud_full_out, index = False)
+        
+    print(f"Egitim Cikti Dosyasi Kaydedildi (CSV): {fraud_train_out}")
+    print(f"Test Cikti Dosyasi Kaydedildi (CSV): {fraud_test_out}")
+    print(f"Train Test Birlesik Cikti Dosyasi Kaydedildi (CSV): {fraud_full_out}")
+        
+    result_dict = {
+            'X_train': X_train_processed
+            ,'X_test': X_test_processed
+            ,"y_train": y_train_processed
+            ,"y_test": y_test_processed
+            ,"X_train_balanced": X_train_balanced
+            ,"y_train_balanced" : y_train_balanced
+    }
+    return result_dict    
+    
+if __name__ == '__main__':
+    demo_preprocessing() 
+    
