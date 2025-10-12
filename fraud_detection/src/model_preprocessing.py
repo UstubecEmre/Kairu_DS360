@@ -158,4 +158,39 @@ class Feature_Preprocessor:
                 logger.error(f"Beklenmedik Hata Olustu: {err}")
                 return {} 
         return outlier_info
+    
+    def extract_new_features(self, dataframe: pd.DataFrame)->pd.DataFrame:
+        """Ozellik muhendisligi gerceklestirir, yeni ozellikler turetir
+        Args:
+            dataframe (pd.DataFrame): Girdi DataFrame'i
+        
+        Returns:
+            df_featured (pd.DataFrame): Ozellik muhendisligi gerceklestirilmis DataFrame
+        
+        """
+        df_featured = dataframe.copy()
+        
+        # Carpikligi olan degiskenlere log1p donusumu uygula
+        if 'Amount' in df_featured.columns:
+            if (df_featured['Amount'] < 0).any():
+                logger.warning(f"'Amount' sutununda negatif degerler bulundu. log donusumu gerceklestirilemedi")
+            else:
+                df_featured['Amount_log_transformed'] = np.log1p(df_featured['Amount'])
+            
+        # Tarih-saat-zaman degiskenlerinden yeni ozellik turet
+        if 'Time' in df_featured.columns:
+            df_featured['Day_of_week'] = (df_featured['Time'] // (3600 * 24)) % 7 # bir hafta 7 gun, 1 saat 3600 saniye
+            df_featured['Hour'] = (df_featured['Time'] // (3600)) % 24 # bir gun 24 saat
+        
+        # interaction features (ilk 2 sayisal degisken)
+        if hasattr(self, 'numerical_features') and len(self.numerical_features) >= 2:
+            feature_1, feature_2 = self.numerical_features[:2] # 0 ve 1. index degerleri sirasiyla ilgili degiskenlere atanir
+            df_featured[feature_2] = pd.to_numeric(df_featured[feature_2], errors='coerce')
+
+            df_featured[f'{feature_1}_{feature_2}_ratio'] = df_featured[feature_1] / df_featured[feature_2].replace(0, np.nan)
+            df_featured[f'{feature_1}_{feature_2}_multiplied'] = df_featured[feature_1] * df_featured[feature_2]
+        
+        logger.info("Ozellik Muhendisligi Gerceklestirildi")
+        return df_featured
+        
             
