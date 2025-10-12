@@ -358,3 +358,43 @@ class Feature_Preprocessor:
             df_processed[target_col] = target
             
         return df_processed, target
+
+
+    def show_distributions(self, df_original:pd.DataFrame, df_processed:pd.DataFrame, target_col:str = None):
+        if not hasattr(self, "numerical_features"):
+            logger.warning("'numerical_features' isminde bir ozellik bulunmamaktadir")
+            return False 
+            
+            
+        try:
+            num_cols = [col for col in self.numerical_features
+                        if col in df_original.columns]
+            if not num_cols:
+                logger.warning("Beklenmeyen Sutun Gozlemlendi")
+                    
+            
+            n_cols = len(num_cols)
+            fig, axs = plt.subplots(2, n_cols, figsize = (5 * n_cols, 8))
+            axs = np.array(axs).reshape(2, n_cols)
+                    
+            for idx, col in enumerate(num_cols):
+                axs[0, idx].hist(df_original[col], bins = 100, alpha = 0.8, color = "mediumpurple")
+                axs[0, idx].set_title(f"Original_{col} Sutunu")
+                axs[0, idx].set_xlabel(f"{col}")
+                axs[0, idx].set_ylabel("Frekans")
+                        
+                if col in df_processed.columns:
+                    axs[1, idx].hist(df_processed[col], bins = 100, alpha = 0.8, color = "orange")
+                    axs[1, idx].set_title(f"Processed_{col} Sutunu")
+                    axs[1, idx].set_xlabel(f"{col}")
+                    axs[1, idx].set_ylabel("Frekans")
+            plt.tight_layout()
+            plt.grid(axis= "y")
+            plt.show()
+                
+        except Exception as err:
+            logger.error(f"Beklenmeyen Bir Hata Olustu: {err}")
+             
+        
+                    
+        
