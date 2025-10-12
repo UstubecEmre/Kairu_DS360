@@ -395,6 +395,15 @@ class Feature_Preprocessor:
         except Exception as err:
             logger.error(f"Beklenmeyen Bir Hata Olustu: {err}")
              
-        
+    def get_feature_informations(self, dataframe:pd.DataFrame)->dict:
+        """Degiskenlerin ozelliklerini dondurur"""
+        feature_information = {
+            "categorical_features": self.categorical_features
+            ,"scaling_method": self.scaling_method
+            ,"numerical_features": self.numerical_features
+            ,"encoding_method": self.encoding_method
+            ,"encoded_feature_names": self.encoded_features
+        }
+        return feature_information
                     
         
