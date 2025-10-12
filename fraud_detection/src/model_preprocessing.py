@@ -405,5 +405,47 @@ class Feature_Preprocessor:
             ,"encoded_feature_names": self.encoded_features
         }
         return feature_information
-                    
+    
+
+
+class ImbalanceHandler:
+    """Dengesiz veri setlerinde SMOTE, ADASYN, SMOTETOMEK yontemlerini uygular"""
+    @staticmethod
+    def find_target_class_ratio(y, target_cols = None):
+        unique_val, nunique_val = np.unique(y, return_counts=True)
+        print("Sinif Dagilimi")
+        for idx, (cls, count) in enumerate(zip(unique_val, nunique_val)):
+            col = target_cols[idx] if target_cols else f"Class {cls}"
+            percentage = (count / len(y)) * 100
+            print(f"{col} sutunu: {nunique_val} Orani: {percentage:.4f}%")
+        
+        # dengesizlik orani
+        imbalance_ratio = max(nunique_val) / min(nunique_val)
+        print(f"Veri Setinin Dengesizlik Orani: {imbalance_ratio:.4f}")
+
+        # gorsellestirme notebooks icerisinde var. Dilerseniz buraya da ekleyebilirsiniz
+        
+        
+        
+    @staticmethod
+    def apply_smote(X, y, sampling_strategy = 'auto', random_state = 42):
+        smote = SMOTE(sampling_strategy= sampling_strategy, random_state= random_state)
+        X_resampled, y_resampled = smote.fit_resample(X, y)
+        
+        logger.info(f"Sentetik Veri Uretimi Gerceklestirildi. {len(X)} -> {len(X_resampled)}")
+        return X_resampled, y_resampled
+    
+    @staticmethod
+    def apply_adasyn(X, y, sampling_strategy = 'auto', random_state = 42):
+        adasyn = ADASYN(sampling_strategy = sampling_strategy, random_state = 42)
+        X_resampled, y_resampled = adasyn.fit_resample(X,y)
+        logger.info(f"ADASYN Methodu Uygulandi: {len(X)} -> {len(X_resampled)}")
+        return X_resampled, y_resampled
+    
+    @staticmethod
+    def apply_smotetomek(X, y, sampling_strategy = 'auto', random_state = 42):
+        smotemek = SMOTETomek(sampling_strategy = sampling_strategy, random_state= random_state)
+        X_resampled, y_resampled = smotemek.fit_resample(X,y)
+        logger.info(f"SMOTETomek Methodu Uygulandi: {len(X)} -> {len(X_resampled)}")
+        return X_resampled, y_resampled
         
