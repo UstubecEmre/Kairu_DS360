@@ -2,6 +2,7 @@
 import pandas as pd
 from sklearn.metrics import roc_auc_score, roc_curve, precision_recall_curve, f1_score, accuracy_score, precision_score, recall_score, classification_report, confusion_matrix
 from sklearn.metrics import ConfusionMatrixDisplay
+import json 
 
 
 
@@ -49,5 +50,12 @@ class ModelEvaluater():
         disp_conf_mat = ConfusionMatrixDisplay(conf_mat)
         disp_conf_mat.plot(cmap = "coolwarm", fmt = "%d" )
         
-        
+    
+    
+    def print_evaluation(self, save_path = False):
+        print(json.dumps(self.evaluation_scores, indent = 4, ensure_ascii= False))
+        if save_path:
+            with open(save_path, mode = 'w', encoding = 'utf-8') as file:
+                json.dump(self.evaluation_scores, file, indent = 4, ensure_ascii= False)
+            print(f"Degerlendirme Sonuclari Kaydedildi. Dosya Yolu: {save_path}")
         
