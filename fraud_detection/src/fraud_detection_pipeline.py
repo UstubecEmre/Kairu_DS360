@@ -522,7 +522,7 @@ class FraudDetectionPipeline():
             # oznitelikleri kaydet
             features_info = {
                 'feature_names': list(self.X_train_processed.columns),
-                'n_features': len(self.X_train_processed),
+                'n_features': len(self.X_train_processed.shape[1]),
                 'preprocessing_config': self.config.get('preprocessing', {})
             }
             # features_info'yu save_path'e kaydet
@@ -532,5 +532,31 @@ class FraudDetectionPipeline():
             )
             logger.info(f"Model Oznitelikleri Kaydedildi")
             
-        
+    def load_models(self, load_path = 'models/'):
+        """Modelleri models klasorune yukler"""
+        try:
+            # preprocesser nesnesi yuklu mu
+            self.preprocessor = joblib.load(
+                filename= os.path.join(load_path, 'preprocessor.pkl')
+            )
+            logger.info("On Isleme Nesnesi Olusturuldu")
             
+            # modelleri yukle
+            model_files = [file for file in os.listdir(load_path) if file.endswith('_model.pkl')] 
+            for model_file in model_files:
+                model_name = model_file.replace('_model.pkl', '')
+                model_path = os.path.join(load_path, model_file)
+                self.models[model_name] = joblib.load(model_path)
+                logger.info(f"{model_name} Modeli Yuklendi")
+                
+            feature_info = joblib.load(os.path.join(
+                load_path,
+                'feature_info.pkl'
+            ))
+            logger.info(f"Model Oznitelikleri Yuklendi. {feature_info['n_features']} Adet Oznitelik Bulunmaktadir.")
+            logger.info(f"Modeller Yuklendi. Dosya Yolu: {load_path}")
+        
+        except Exception as err:
+            logger.error(f"Model Yuklemesinde Beklenmeyen Bir Hata Olustu: {err}")
+        
+                
