@@ -558,5 +558,43 @@ class FraudDetectionPipeline():
         
         except Exception as err:
             logger.error(f"Model Yuklemesinde Beklenmeyen Bir Hata Olustu: {err}")
+    
+    
+    def predict(self, data, model_name = "random_forest"):
+        """Varsayilan model olarak RandomForestClassifier() kullanir ve tahmin yapar"""
+        # gecerli bir model mi?
+        if model_name not in self.models:
+            logger.error(f"Gecersiz Model Ismi {model_name} Girdiniz: ")
+            return None, None
+        if hasattr(self, 'preprocessor') or self.preprocessor is None:
+            logger.error(f"Lutfen On Isleme Nesnesini (preprocessor) Bos Birakmayiniz")
+            return None, None
+            
+            
+        # islenmis veri (data_processed) ile calis
+        try:
+            data_processed = self.preprocessor.transform_model(data)
+        except Exception as err:
+            logger.error(f"Veri On Isleme Asamasinda Beklenmedik Hata Olustu: {err}")
+            return None, None 
         
-                
+        # model
+        model = self.models[model_name]
+        
+        if model_name in ['isolation_forest', 'lof']:
+            # denetimsiz ogrenme (kumeleme gib)
+            predictions = model.predict(data_processed)
+            probabilities = np.where(predictions == -1, 0.8, 0.2) # aykırı deger donusumu yapiyoruz
+            logger.info(f"{model_name} Modeli Kullanilarak Denetimsiz Ogrenme Tahmin Islemi Gerceklestirildi")
+            return predictions, probabilities
+
+        try:
+            # denetimli ogrenme
+            predictions = model.predict(data_processed)
+            probabilities = model.predict_proba(data_processed)[:, 1] # pozitifleri al
+            logger.info(f"{model_name} Modeli Kullanilarak Denetimli Ogrenme Tahmin Islemi Gerceklestirildi")
+            return predictions, probabilities
+        except Exception as err:
+            logger.error(f"{model_name} Modeliyle Tahmin Yapilirken Bilinmeyen Hata Olustu: {err}")
+            return None, None
+        
