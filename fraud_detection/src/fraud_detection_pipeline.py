@@ -56,7 +56,7 @@ class FraudDetectionPipeline():
         
         # Pipeline Elementleri (On isleme, modelleme, degerlendirme, kaydetme vb.)
         self.preprocessor = None
-        self.explanier = None 
+        self.explainer = None 
         self.models = {}
         self.evaluators = {}
         
@@ -68,7 +68,35 @@ class FraudDetectionPipeline():
         self.y_test = None 
         
         logger.info("Dolandiricilik Tespiti Pipeline'i Baslatiliyor")
+    
+    def _setup_logging(self):
+        """Logging ayarlamasi"""
+        global logger # global logger tanimla
         
+        # yapilanmayi ayarla
+        log_config = self.config.get('logging', {})
+        
+        # ozelliklerini al
+        log_level = getattr(logging, log_config.get('level', 'INFO'))
+        
+        # formatini belirle
+        log_format = log_config.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        
+        
+        logging.basicConfig(level=log_level, format=log_format)
+        
+        logger = logging.getLogger(__name__)
+        
+        # File logging
+        if log_config.get('file_logging', False):
+            # eger file_logging yoksa logs isminde bir klasor olustur
+            os.makedirs('logs', exist_ok=True)
+            
+            file_handler = logging.FileHandler(log_config.get('log_file', 'logs/pipeline.log'))
+            # formatini ayarla
+            file_handler.setFormatter(logging.Formatter(log_format))
+            
+            logger.addHandler(file_handler)
         
     def _load_configuration(self, configuration_path):
         """Yapilandirma dosyasini yukler"""
@@ -117,24 +145,27 @@ class FraudDetectionPipeline():
         mlflow_configuration = self.config.get('mlflow', {})
         
         # takip icin
-        tracking_uri = mlflow.config.get('tracking_uri', 'sqlite//mlflow.db')
+        tracking_uri = mlflow_configuration.get('tracking_uri', 'sqlite///mlflow.db')
         mlflow.set_tracking_uri(tracking_uri)
         
         # gozlemlerini olusturalim
-        experiment_name = mlflow.config.get('experiment_name', 'fraud_detection')
-        mlflow.set_experiment(experiment_name=experiment_name)
+        experiment_name = mlflow_configuration.get('experiment_name', 'fraud_detection')
+        mlflow.set_experiment(experiment_name)
 
         # otomatik loglamayi saglayalim
-        if mlflow.config.get('autolog', {}).get('sklearn', True):
+        if mlflow_configuration.get('autolog', {}).get('sklearn', True):
             mlflow.sklearn.autolog()
         
         logger.info(f"MLFlow Yapilandirilmasi Basarili Bir Sekilde Gerceklesti: {experiment_name}")
         
-        
-    def load_fraud_data_from_kagglehub(self, synthetic = True, data_path = None, dowload_with_kagglehub = False):
+    
+    
+    
+    
+    def load_fraud_data_from_kagglehub(self, synthetic = False, data_path = None, download_with_kagglehub = False):
         
         """download_with_kagglehub argumani True ise kagglehub uzerinden fraud detection veri setini yukler"""
-        if dowload_with_kagglehub:
+        if download_with_kagglehub:
             logger.info("KaggleHub Uzerinden Dolandiricilik Tespiti (Fraud Detection) Veri Seti Indiriliyor")
             
             try:
@@ -566,7 +597,7 @@ class FraudDetectionPipeline():
         if model_name not in self.models:
             logger.error(f"Gecersiz Model Ismi {model_name} Girdiniz: ")
             return None, None
-        if hasattr(self, 'preprocessor') or self.preprocessor is None:
+        if not hasattr(self, 'preprocessor') or self.preprocessor is None:
             logger.error(f"Lutfen On Isleme Nesnesini (preprocessor) Bos Birakmayiniz")
             return None, None
             
@@ -598,3 +629,153 @@ class FraudDetectionPipeline():
             logger.error(f"{model_name} Modeliyle Tahmin Yapilirken Bilinmeyen Hata Olustu: {err}")
             return None, None
         
+        
+    def _find_best_model(self):
+        """ROC-AUC degerine gore en iyi modeli ve skorunu bulur"""
+        best_model_name = None 
+        best_model_roc_auc_score = 0
+            
+        # dongu ile don
+        for model_name, evaluater in self.evaluators.items():
+            if evaluater.results and 'roc_auc' in evaluater.results:
+                roc_auc = evaluater.results['roc_auc']
+                if best_model_roc_auc_score < roc_auc:
+                    best_model_name = model_name
+                    best_model_roc_auc_score = roc_auc
+        
+        if best_model_name is None:
+            logger.warning(f"'best_model_name,' argumani None Olamaz")
+            best_model_name = 'random_forest'
+        
+        logger.info(f"En Iyi Model:{best_model_name}\nEn Iyi ROC_AUC Skoru: {best_model_roc_auc_score}")
+        return best_model_name # or 'random_forest' best_model_name = 'random_forest' ekledigimiz icin gerek kalmadi
+    
+    
+    def run_pipeline(self, data_path = None, save_models = True, use_kagglehub = False):
+        """Veriyi yukler, on isleme adimlarindan gecirir, modeli egitir, modeli degerlendirir"""
+        logger.info("Veri Bilimi Adimlariniz Adim Adim Baslatiliyor")
+        
+        try:
+            # 1.Adim => Veriyi Yuklemek
+            self.load_fraud_data_from_kagglehub(
+                data_path = data_path,
+                download_with_kagglehub = use_kagglehub,
+                synthetic = False
+            )
+            
+            # 2. Adim => Verinin On Islenmesi
+            self.preprocess_data()
+            
+            # 3. Adim => Verinin Modellenmesi => Modelin Egitilmesi
+            self.train_models()
+            
+            
+            # 4. Adim Modelin Degerlendirilmesi
+            self.evaluate_models()
+            
+            # 5. Sonuclarin aciklanabilirligini gozlemle
+            self.explain_model()
+            
+            # 6. En iyi modeli getir
+            best_model = self._find_best_model()
+            
+            # 7. En iyi modelin aciklanabilirligini goster
+            self.explain_model(model_name = best_model)
+            
+            # save_models parametresi True ise models/ klasoru altina kaydet
+            if save_models:
+                self.save_models() # save_path parametresi
+                logger.info(f"{best_model} Modelinizin Bilgileri Kaydediliyor...")
+                
+            logger.info(f"Veri Bilimi Adimlariniz Sirasiyla Gerceklestirildi")
+            
+        except Exception as err:
+            logger.error(f"Veri Bilimleri Adimlarinda Beklenmeyen Hata Olustu: {err}")
+            return False 
+
+
+
+def main():
+    """ Command-Line Interface (Komut Satiri Arayuzu) """
+    
+    # argumanlari tanimlayalim
+    parser = argparse.ArgumentParser(description= 'Fraud Detection Pipeline')
+    
+    parser.add_argument("--config", default = 'config/configuration.yaml', help = 'Configuration Path (Yapilandirma Dosya Yolu)')
+    
+    # veri dosyasini ekle
+    parser.add_argument("--data", help = "Data File Path (Veri Dosya Yolu)")
+    
+    # egitim, test, tahmin olarak mode belirle
+    parser.add_argument("--mode", choices = ['train', 'predict', 'explain'], default = 'train')
+    
+    # model belirle
+    parser.add_argument("--model", default= 'random_forest', help = "Model Name For Prediction(Tahminleme Icin Model ismi) ")
+    
+    # Modelleri yukle
+    parser.add_argument("--load_models", action = 'store_true', help = "Load Existing Models (Var Olan Modelleri Yukler)")
+    
+    # Modelleri kaydet
+    parser.add_argument("--save_models", action = 'store_true', help = "Save Trained Models (Egitilmis Modelelri Kaydeder)")
+    
+    # Veri seti nereden yuklenecek?
+    parser.add_argument("--use_kagglehub", action = 'store_true', help = 'Download Data With KaggleHub (KaggleHub ile Veri Setini Yukler)')
+    
+    # arguman listesinde tutalim
+    args = parser.parse_args()
+    
+    # Olusturulan PipeLine'i calistir
+    fraud_pipeline = FraudDetectionPipeline(args.config)
+    
+    # Yukarida belirtilen egitim (train), aciklama (explain) ve tahmin (predict) modunu tanimlayalim
+    if args.mode == 'train':
+        success = fraud_pipeline.run_pipeline(
+            data_path = args.data,
+            save_models = args.save_models,
+            use_kagglehub = args.use_kagglehub     
+        )
+        # Cikis yap
+        sys.exit(0 if success else 1) #basariliysa 0, basarisizda 1 
+    
+    elif args.mode == 'explain':
+        if args.load_models():
+            fraud_pipeline.load_models()
+        
+        #Veri setini yukle    
+        fraud_pipeline.load_fraud_data_from_kagglehub(synthetic= False)
+        
+        # Veri setini on islemeden gecir
+        fraud_pipeline.preprocess_data()
+        
+        # Onem derecesi ve anomali oruntulerini ata
+        importance, pattern = fraud_pipeline.explain_model(model_name = args.model)
+        
+        print(f"En Onemli 10 Degisken (Top 10 Important Features)")
+        for idx, (feature, score) in enumerate(list(importance.items())[-10:]):
+            print(f"{idx + 1}. {feature} Degiskeninin Onem Skoru: {score:.4f}")
+    
+    elif args.mode == 'predict':
+        # egitilmis modelleri yukle
+        if args.load_models:
+            fraud_pipeline.load_models()
+            
+        # Veriyi yukle ve onu on isleme adimlarina sok
+        fraud_pipeline.load_fraud_data_from_kagglehub(synthetic=False)
+        fraud_pipeline.preprocess_data()
+        
+        # tahmin degerlerini ve olasiklarini al
+        predictions, probabilities = fraud_pipeline.predict(
+            data = fraud_pipeline.X_test_processed.head(),
+            model_name = args.model
+        )
+        
+        # 5 adet gozlemin tahmin degerini ve olasiligini alalim
+        for idx, (prediction, probability) in enumerate(zip(predictions[:5], probabilities[:5])):
+            print(f"Ornek_{idx} Tahmin Degeri: {prediction}; Olasiligi: {probability:.2f}")
+            
+        
+        print("Orneklemler Uzerinden Tahminleme")
+
+
+if __name__ == '__main__':
+    main()
