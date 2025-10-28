@@ -1,0 +1,75 @@
+# Sanal ortam
+fourt_week_env/
+
+# Veri dosyaları
+data/
+
+# Log dosyaları
+logs/
+
+# MLflow artifact ve tracking dosyaları
+mlartifacts/
+mlflow.db
+
+# Config dosyaları
+config/configuration.yaml
+
+# Python cache ve derlemeleri
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+
+# Byte-compiled / optimized / DLL files
+*.py[codz]
+*$py.class
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+
+# Sistem dosyaları
+.DS_Store
+Thumbs.db
+
+# IDE ve editör ayarları
+.vscode/
+.idea/
+
+
+#Streamlit
+.streamlit/secrets.toml
+
+
+
+# Model files
+*.pkl
+*.joblib
+*.sav
+*.h5
+*.model
