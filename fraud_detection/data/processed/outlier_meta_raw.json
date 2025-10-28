@@ -1,0 +1,58 @@
+{
+    "input": {
+        "file_path": "D:\\Kairu_DS360_Projects\\fourth_week_project\\fraud_detection\\data\\raw\\creditcard_fraud.csv",
+        "n_total": 284807,
+        "n_train": 227845,
+        "n_test": 56962,
+        "fraud_rate_test": 0.0017204452090867595
+    },
+    "output": {
+        "csv_path": "D:\\Kairu_DS360_Projects\\fourth_week_project\\fraud_detection\\data\\processed\\anomaly_scores_raw.csv",
+        "meta_path": "D:\\Kairu_DS360_Projects\\fourth_week_project\\fraud_detection\\data\\processed\\outlier_meta_raw.json"
+    },
+    "models": {
+        "isolation_forest": {
+            "parameters": {
+                "n_estimators": 500,
+                "contamination": "auto",
+                "random_state": 42
+            },
+            "metrics": {
+                "roc_auc_score": 0.9523020554592124,
+                "average_precision": 0.17808015586061826,
+                "threshold": 0.1423945488501588,
+                "precision": 0.26119402985074625,
+                "recall": 0.35714285714285715,
+                "f1": 0.3017241374430737
+            },
+            "summary": {
+                "alarm_rate": 0.0023700010533338014,
+                "notes": "Yuksek skorlu örnekler anomaliye daha yakindir. Bunun icin - ile carpilmistir"
+            }
+        },
+        "local_outlier_factor": {
+            "parameters": {
+                "n_neighbors": 30,
+                "contamination": "auto",
+                "novelty": true
+            },
+            "metrics": {
+                "roc_auc_score": 0.711742589551296,
+                "average_precision": 0.007580917634565855,
+                "threshold": 2.519409779511607,
+                "precision": 0.03571428571428571,
+                "recall": 0.04081632653061224,
+                "f1": 0.038095237597460314
+            },
+            "summary": {
+                "alarm_rate": 0.001983778659457182,
+                "notes": "Yuksek skorlu ornekler anomaliye daha yakindir."
+            }
+        }
+    },
+    "general_notes": [
+        "Veri olceklemesi bu calismada kullanilmamistir.",
+        "Threshold (esik deger) secimi F1 skoruna gore optimize edilmistir.",
+        "ROC-AUC yerine Average Precision Score, dengesiz veri setlerinde daha anlamlidir."
+    ]
+}
