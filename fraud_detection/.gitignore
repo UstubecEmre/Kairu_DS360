@@ -1,14 +1,14 @@
 # Sanal ortam
 fourt_week_env/
 
-# Veri dosyaları
-data/
+# Veri dosyaları => gitattributes ile izlenebilir hale getirilebilir
+# data/
 
 # Log dosyaları
 logs/
 
 # MLflow artifact ve tracking dosyaları
-mlartifacts/
+# mlartifacts/ # MLFlow gitattributes ile izlenebilir hale getirilebilir
 mlflow.db
 
 # Config dosyaları
