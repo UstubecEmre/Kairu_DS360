@@ -18,9 +18,9 @@ from sklearn.ensemble import RandomForestClassifier
 
 # feature importances
 from sklearn.inspection import permutation_importance
-from download_data import load_data
+from download_data import load_dataset
 
-fraud_df = load_data()
+fraud_df = load_dataset("D:/Datasets/creditcard.csv")
 
 #%% ensure shap and lime import
 """
@@ -67,7 +67,8 @@ except Exception as err:
 try:
     import lime 
     LIME_AVAILABLE = True 
-    logger.info(f"Lime Modulu Import Edildi.Kullanilan Versiyon: {lime.__version__}")
+    logger.info(f"Lime Modulu Import Edildi.")
+                
 except ImportError:
     logger.warning("Lime Modulu Import Edilmemis")
     LIME_AVAILABLE = False
@@ -162,7 +163,7 @@ class SimpleModelExplainer:
             sns.barplot(
                 y = [self.feature_names[i] for i in sorted_indexes]
                 ,x = perm_importance.importances_mean[sorted_indexes]
-                ,palette ="RdGn")
+                ,palette ="Set2")
             plt.title("Feature Importance (Degiskenlerin Onem Derecesi)")
             plt.xlabel("Permutation Importance (Permutasyon Onem Derecesi)")
             plt.tight_layout()
@@ -173,8 +174,76 @@ class SimpleModelExplainer:
             logger.error(f"Permutation Importance Error (Permutasyon Onem Hatasi): {err}")
             return None 
         
+    def global_feature_importances(self, X_test, y_test, top_n = 10):
+        logger.info("Global En Onemli Degiskenler Hesaplaniyor")
+        if SHAP_AVAILABLE and self.shap_explainer is not None:
+            try:
+                shap_values = self.shap_explainer.shap_values(
+                    X_test
+                )
+                if isinstance(shap_values, list):
+                    shap_values = shap_values[1] # pozitif sinifa gore islem yap
+                
+                shap.summary_plot(
+                    shap_values,
+                    X_test,
+                    feature_names=self.feature_names,
+                    plot_type="bar",
+                    show=False
+                )
+                plt.title("Global Degiskenlerin Onem Dereceleri (SHAP)")
+                plt.tight_layout()
+                plt.show()
+                return shap_values
+            
+            except Exception as err:
+                logger.error(f"Beklenmeyen Bir Hata Olustu: {err}")
+                
+            logger.warning("SHAP Uygun Degil!!! Permutation Importance Yontemi Kullaniliyor")
+            return self.show_feature_importances(X_test, y_test)
         
+    def analyze_fraud_pattern(self, X_test, y_test):
+        logger.info("Dolandiricilik Oruntu Analizi Basliyor")
         
+        # SHAP kullanilabilir mi
+        if not SHAP_AVAILABLE and self.shap_explainer is None:
+            logger.warning("SHAP_AVAILABLE ve shap_explainer None Olamaz!!!")
+            return None 
+        try:
+            shap_values = self.shap_explainer.shap_values(X_test)
+            # liste elemani mi
+            if isinstance(shap_values, list):
+                shap_values = shap_values[1]
+            
+            fraud_indices = np.where(y_test == 1)[0]
+            fraud_shap_mean = np.abs(shap_values[fraud_indices]).mean(axis = 0) # satir bazinda
+            top_features_index = np.argsort(fraud_shap_mean[-10:])
+            top_features = [self.feature_names[col] for col in top_features_index]
+            
+            # Cizdirelim 
+            plt.figure(figsize = (12, 8))
+            sns.barplot(
+                x = fraud_shap_mean[top_features_index],
+                y = top_features,
+                palette = 'viridis'
+            )
+            plt.title("Onemli Ozellikler")
+            plt.tight_layout()
+            plt.show()
+        
+        # en onemlilerden baslayarak sirala
+            result_df = pd.DataFrame(
+                {
+                    'top_features': top_features,
+                    'mean_abs_shap': fraud_shap_mean[top_features_index]
+                }
+            ).sort_values(ascending= False)
+        
+            return result_df
+        except Exception as err:
+            logger.error("Beklenmeyen Hata Olustu: {err}")
+            return None
+            
 def demo_explainability():
     """ RandomForestClassifier modeli kullanilarak degiskenlerin onem derecesini belirler ve model aciklanabilirligi saglar """
     from sklearn.model_selection import train_test_split
@@ -209,7 +278,10 @@ def demo_explainability():
             
     # explainer.show_feature_importances(X_test, y_test)
     explainer.show_feature_importances(X, y) # tum veri seti icin
+    importance = explainer.global_feature_importances(X_test, y_test)
+    fraud_patterns = explainer.analyze_fraud_pattern(X_test, y_test)
     print("Model Aciklanabilirligi Tamamlandi...")
+    
     return explainer
 
 

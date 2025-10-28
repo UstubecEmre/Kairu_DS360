@@ -25,10 +25,11 @@ assert RAW_DIR.exists(), f"Ham Veri Dosya Yolu Bulunamadi: {RAW_DIR}"
 # fraud_df = pd.read_csv(RAW_DIR)
 
 
+
 try:
     PROJECT_DIR = Path(__file__).resolve().parents[1] # fraud detection klasoru altinda olussun, her cagrildiginda ilgili klasorde olusmasin.
 except NameError:
-    PROCESSED_DIR = Path.cwd()
+    PROJECT_DIR = Path.cwd()
 except Exception as err:
     raise Exception(f"Beklenmeyen Bir Hata Olustu: {err}")
 
@@ -48,6 +49,205 @@ OUTLIERS_CSV = PROCESSED_DIR / "anomaly_scores_raw.csv"
 OUTLIER_META_CSV = PROCESSED_DIR / "outlier_meta_raw.json"
 
 #%% aykiri degerler icin esik deger belirle 
+class OutlierDetection:
+    def __init__(self, data_path: str,  processed_dir : str):
+        self.data_path = Path(data_path)
+        self.processed_dir = Path(processed_dir)
+        self.outliers_csv = self.processed_dir / 'anomaly_scores_raw.csv'
+        self.outliers_meta_csv = self.processed_dir / 'outlier_meta_raw.json'
+        os.makedirs(self.processed_dir, exist_ok= True)
+        
+    def _load_data(self)->pd.DataFrame:
+        assert self.data_path.exists(), f"Veri Dosyasi Bulunamadi: {self.data_path}"
+        fraud_df = pd.read_csv(self.data_path)
+        assert 'Class' in fraud_df.columns, "Hedef Degisken 'Class' Bulunamadi"
+        return fraud_df
+    
+    def _prepare_data(self, dataframe: pd.DataFrame):
+        fraud_df = dataframe.copy()
+       
+        if "split" not in fraud_df.columns:
+            print("'split' Sutunu Bulunamadi. Simdi Olusturuluyor...")
+            y_temp = fraud_df['Class'].astype(int).values 
+        
+            index_train, index_test = train_test_split(
+                np.arange(len(fraud_df))
+                ,test_size= 0.20
+                ,stratify= y_temp
+                ,random_state= 42
+        )   
+            split = np.array(['train'] * len(fraud_df), dtype = object)
+            split[index_test] = "test"
+            fraud_df['split'] = split
+        
+        # feature cols => bagimsiz degiskenler
+        feature_cols = [col for col in fraud_df.columns if col not in ('Class','split')]
+        train_fraud = fraud_df[fraud_df['split'] == 'train'].reset_index(drop = True)
+        test_fraud = fraud_df[fraud_df['split'] == 'test'].reset_index(drop = True)
+        
+        X_train =  train_fraud[feature_cols].values
+        X_test = test_fraud[feature_cols].values 
+        y_train = train_fraud['Class'].astype(int).values
+        y_test = test_fraud['Class'].astype(int).values
+        
+        return fraud_df, X_train, X_test, y_train, y_test 
+    
+    
+    def _evaluate(self, y_true, scores):
+        prec, rec, threshold = precision_recall_curve(y_true, scores)
+        f1 = (2 * (prec * rec)) / (prec + rec + 1e-9)
+        best_index = int(np.argmax(f1))
+        threshold_choice = float(threshold[
+            max(
+                0,
+                min(best_index - 1, len(threshold) - 1))
+            ] 
+           if len(threshold) > 0 else 0.0)
+        
+        result_dict = {
+        "threshold": threshold_choice
+        ,"precision": float(prec[best_index])
+        ,"recall": float(rec[best_index])
+        ,"f1": float(f1[best_index])
+        }
+        return result_dict 
+    
+    def detect(self):
+        fraud_df = self._load_data()
+        fraud_df, X_train, X_test, y_train, y_test = self._prepare_data(fraud_df)
+            # Isolation Forest modeli egit
+        iso = IsolationForest(n_estimators= 500, random_state= 42, contamination = "auto")
+        iso.fit(X_train)
+        # Yuksek skorlar, anomoli yani aykiri degere karsilik gelmektedir.
+        # Burada isaret degistirerek anomalileri alalim.
+        iso_train_scores = -iso.decision_function(X_train)
+        iso_test_scores = -iso.decision_function(X_test)
+        iso_metrics = self._evaluate(y_test, iso_test_scores)
+        iso_metrics["roc_auc"] = roc_auc_score(y_test, iso_test_scores)
+        iso_metrics["avg_precision"] = average_precision_score(y_test, iso_test_scores)
+        iso_test_alarm = (iso_test_scores >= iso_metrics["threshold"]).astype(int)
+        
+        
+        
+        # Local Outlier Factor
+        lof = LocalOutlierFactor(n_neighbors=30, contamination="auto", novelty=True)
+        lof.fit(X_train)
+        lof_train_scores = -lof.score_samples(X_train)
+        lof_test_scores = -lof.score_samples(X_test)
+        lof_metrics = self._evaluate(y_test, lof_test_scores)
+        lof_metrics["roc_auc"] = roc_auc_score(y_test, lof_test_scores)
+        lof_metrics["avg_precision"] = average_precision_score(y_test, lof_test_scores)
+        lof_test_alarm = (lof_test_scores >= lof_metrics["threshold"]).astype(int)
+        
+
+        
+        fraud_df['iso_score'] = np.nan
+        fraud_df['iso_alarm'] = 0
+        
+        fraud_df['lof_score'] = np.nan
+        fraud_df['lof_alarm'] = 0
+        
+        fraud_df.loc[fraud_df['split'] == 'train', 'iso_score'] = iso_train_scores
+        fraud_df.loc[fraud_df['split'] == 'test', 'iso_score'] = iso_test_scores
+        fraud_df.loc[fraud_df['split'] == 'test', 'iso_alarm'] = iso_test_alarm
+        
+        
+        fraud_df.loc[fraud_df['split'] == 'train', 'lof_score'] = lof_train_scores
+        fraud_df.loc[fraud_df['split'] == 'test', 'lof_score'] = lof_test_scores
+        fraud_df.loc[fraud_df['split'] == 'test', 'lof_alarm'] = lof_test_alarm
+        
+        fraud_df.to_csv(self.outliers_csv, index = False)
+        print(f"Aykiri Deger Tespit Dosyasi Kaydedildi: {self.outliers_csv}")
+        
+        meta_data = {
+            "input": {
+                "file_path": str(self.data_path),
+                "n_total": len(fraud_df),
+                "n_train": len(X_train),
+                "n_test": len(X_test),
+                "fraud_rate_test": float(y_test.mean())
+            },
+            "output": {
+                "csv_path": str(self.outliers_csv),
+                "meta_path": str(self.outliers_meta_csv)
+            },
+            "models": {
+                "isolation_forest": {
+                    "parameters": {"n_estimators":500,"contamination":"auto","random_state":42},
+                    "metrics": iso_metrics,
+                    "summary": {"alarm_rate": iso_test_alarm.mean(),"notes":"- ile çarpılarak anomali skorları elde edildi"}
+                },
+                "local_outlier_factor": {
+                    "parameters": {"n_neighbors":30,"contamination":"auto","novelty":True},
+                    "metrics": lof_metrics,
+                    "summary": {"alarm_rate": lof_test_alarm.mean(),"notes":"- ile carpilarak anomali skorlari elde edildi"}
+                }
+            },
+            "general_notes": [
+                "Veri ölçeklemesi Kullanilmamistir.",
+                "Threshold F1 skoruna göre optimize edilmistir.",
+                "Average Precision Score dengesiz veri setlerinde ROC-AUC yerine tercih edilmistir."
+            ]
+        }
+        
+        # kaydedelim
+        with open(OUTLIER_META_CSV, mode = 'w', encoding ='utf-8') as file:
+            json.dump(meta_data
+                    ,file
+                    ,indent= 4
+                    ,ensure_ascii= False)
+            print(f"Meta Degerlerin Bulundugu Klasor Yolu: {OUTLIER_META_CSV}")
+        return iso_metrics, lof_metrics
+
+    def predict_isolation_forest(self, X):
+        """Verilen X üzerinde Isolation Forest skorlarini dondurur"""
+        if not hasattr(self, 'iso'):
+            raise ValueError("Isolation Forest modeli henüz fit edilmemis")
+        return -self.iso.decision_function(X) # - ile carpilmalidir
+
+    def predict_lof(self, X):
+        """Verilen X üzerinde LOF skorlarini dondurur"""
+        if not hasattr(self, 'lof'):
+            raise ValueError("LOF modeli henüz fit edilmemis")
+        return -self.lof.score_samples(X)
+    
+
+
+
+class OutlierDetector():
+    def __init__(self, scaler = None):
+        self.scaler = scaler
+        self.isolation_forest = None
+        self.lof = None
+    
+    def predict_isolation_forest(self, X):
+        if self.isolation_forest is None:
+            raise ValueError("Egitilmis Modeli Tanimlamaniz Gerekmektedir")
+        
+        if self.scaler is None:
+            raise ValueError("Lutfen Olceklendiriciyi (scaler) Giriniz. (robust, minmax, standart)")
+        
+        if self.scaler is not None:
+            X = self.scaler.transform(X)
+        
+        iso_predicts = self.isolation_forest.predict(X)
+        
+        # normal 1; outlier -1
+        return np.where(iso_predicts == -1, 1, 0)
+    
+
+    def predict_lof(self, X):
+        if self.lof is None:
+            raise ValueError("Local Outlier Factor modeli atanmadi.")
+        
+        if self.scaler is not None:
+            X =self.scaler.transform(X)
+        
+        lof_predicts = self.lof.predict(X)
+        return np.where(lof_predicts == -1, 1, 0)
+
+#%% Non Moduler Version
+
 def detect_outlier_threshold_by_f1(y_true, scores):
     """ 
     Precision Recall Egrisini kullanarak Anomali Tespiti Gerceklestirir
@@ -71,6 +271,7 @@ def detect_outlier_threshold_by_f1(y_true, scores):
         ,"recall": float(rec[best_index])
         ,"f1": float(f1[best_index])
     }
+
 
 
 
@@ -236,7 +437,7 @@ def main():
     # "metadata_created_at": pd.Timestamp.now().isoformat(),
     "general_notes": [
         "Veri olceklemesi bu calismada kullanilmamistir.",
-        "Threshold (esik deger) secimi F1 skoruna göre optimize edilmistir.",
+        "Threshold (esik deger) secimi F1 skoruna gore optimize edilmistir.",
         "ROC-AUC yerine Average Precision Score, dengesiz veri setlerinde daha anlamlidir."
     ]
 }

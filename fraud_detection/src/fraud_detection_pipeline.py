@@ -292,7 +292,7 @@ class FraudDetectionPipeline():
         # hedef degiskeni cikar
         self.X_train_processed = train_fraud_processed.drop('Class', axis = 1)
         self.y_train_processed = train_fraud_processed['Class']
-        
+           
         
         self.X_test_processed = test_fraud_processed.drop('Class', axis = 1)
         self.y_test_processed = test_fraud_processed['Class']
@@ -520,7 +520,9 @@ class FraudDetectionPipeline():
         # SHAP analizi
         explainer_config = self.config.get('explainability', {}).get('shap', {})
         self.explainer.initialize_shap(
-            explainer_type = explainer_config.get('explainer_type', 'auto'),
+            # explainer_type = explainer_config.get('explainer_type', 'auto'),
+            explainer_type = explainer_config.get('explainer_type', 'tree'),
+            
             # max_evals = explainer_config.get('max_evals', 100) 
         )
                     

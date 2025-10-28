@@ -131,7 +131,7 @@ class Feature_Preprocessor:
         if hasattr(self, 'numerical_features') and self.numerical_features:
             try:
                 for col in self.numerical_features:
-                    if method == 'îqr':
+                    if method == 'iqr':
                         Q1 = dataframe[col].quantile(0.25)
                         Q3 = dataframe[col].quantile(0.75)
                         IQR = Q3 - Q1 
@@ -314,6 +314,7 @@ class Feature_Preprocessor:
         # Oznitelik uret
         df_processed = self.extract_new_features(df_processed)
         
+        self.identify_real_data_types(df_processed)
         # scaling and encoding
         if hasattr(self, "numerical_features") and self.numerical_features:
             try:
