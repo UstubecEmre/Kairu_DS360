@@ -275,14 +275,15 @@ class FraudDetectionPipeline():
         )
         
         # 
-        train_fraud_data = pd.concat([self.X_train, self.y_train])
-        train_fraud_processed = self.preprocessor.fit_transform_model(
+        train_fraud_data = pd.concat([self.X_train, self.y_train], axis = 1)
+        # tuple donecek, dikkat et
+        train_fraud_processed, _ = self.preprocessor.fit_transform_model(
             train_fraud_data,
             target_col = 'Class' 
         )
         
-        test_fraud_data = pd.concat([self.X_test, self.y_test])
-        test_fraud_processed = self.preprocessor.transform_model(
+        test_fraud_data = pd.concat([self.X_test, self.y_test], axis = 1)
+        test_fraud_processed, _ = self.preprocessor.transform_model(
             test_fraud_data,
             target_col = 'Class'
         )   
@@ -572,7 +573,7 @@ class FraudDetectionPipeline():
             # oznitelikleri kaydet
             features_info = {
                 'feature_names': list(self.X_train_processed.columns),
-                'n_features': len(self.X_train_processed.shape[1]),
+                'n_features': self.X_train_processed.shape[1],
                 'preprocessing_config': self.config.get('preprocessing', {})
             }
             # features_info'yu save_path'e kaydet
@@ -599,11 +600,11 @@ class FraudDetectionPipeline():
                 self.models[model_name] = joblib.load(model_path)
                 logger.info(f"{model_name} Modeli Yuklendi")
                 
-            feature_info = joblib.load(os.path.join(
+            features_info = joblib.load(os.path.join(
                 load_path,
-                'feature_info.pkl'
+                'features_info.pkl'
             ))
-            logger.info(f"Model Oznitelikleri Yuklendi. {feature_info['n_features']} Adet Oznitelik Bulunmaktadir.")
+            logger.info(f"Model Oznitelikleri Yuklendi. {features_info['n_features']} Adet Oznitelik Bulunmaktadir.")
             logger.info(f"Modeller Yuklendi. Dosya Yolu: {load_path}")
         
         except Exception as err:
@@ -734,12 +735,14 @@ def main():
     # Modelleri yukle
     parser.add_argument("--load_models", action = 'store_true', help = "Load Existing Models (Var Olan Modelleri Yukler)")
     
-    # Modelleri kaydet
-    parser.add_argument("--save_models", action = 'store_true', help = "Save Trained Models (Egitilmis Modelelri Kaydeder)")
+    
     
     # Veri seti nereden yuklenecek?
     parser.add_argument("--use_kagglehub", action = 'store_true', help = 'Download Data With KaggleHub (KaggleHub ile Veri Setini Yukler)')
     
+    # Veri setindeki modelleri egitimden sonra kaydeder
+
+    parser.add_argument("--save_models", action="store_true", help="Save Trained Models After Training (Egitimden Sonra Egitilmis Modelleri Kaydeder)")
     # arguman listesinde tutalim
     args = parser.parse_args()
     
