@@ -1,8 +1,9 @@
 #%% import required libraries (Gerekli kutuphane modullerini iceri aktar)
 import pandas as pd
-from sklearn.metrics import roc_auc_score, roc_curve, precision_recall_curve, f1_score, accuracy_score, precision_score, recall_score, classification_report, confusion_matrix
+from sklearn.metrics import auc, roc_auc_score, roc_curve, precision_recall_curve, f1_score, accuracy_score, precision_score, recall_score, classification_report, confusion_matrix
 from sklearn.metrics import ConfusionMatrixDisplay
 import json 
+import numpy as np
 
 
 
@@ -27,11 +28,16 @@ class ModelEvaluater():
         # esik deger olarak 0.5 belirledik, bu deger artirilabilir
         y_pred = (y_pred_proba >=threshold).astype(int) 
         prec, rec, threshold = precision_recall_curve(y_true, y_pred_proba)
+        prec_auc = auc(rec, prec)
+        
+        # Esik degerleri listeye donusturmeden once uzunluklarini esitleyelim
+        threshold = np.append(threshold, 1.0)
         evaluate_scores = {
             "accuracy": accuracy_score(y_true, y_pred)
             ,"precision": precision_score(y_true, y_pred)
             ,"recall": recall_score(y_true, y_pred)
             ,"f1": f1_score(y_true, y_pred)
+            ,'prec_auc':prec_auc
             ,"confusion_matrix": confusion_matrix(y_true, y_pred).tolist()
             ,"roc_auc": roc_auc_score(y_true, y_pred_proba)
             ,"precision_curve": prec.tolist()
@@ -53,9 +59,17 @@ class ModelEvaluater():
     
     
     def print_evaluation(self, save_path = False):
+        if not self.evaluation_scores:
+            raise ValueError("Once Değerlendirme Metriği Hesaplanmalidir!!! calc_metrics() Metodu Cagrilmalidir")
+            return # kodu burada bitirelim
+        
+        # Ekrana yazdiralim
+        print("Model Degerlendirme Sonuclari:")
         print(json.dumps(self.evaluation_scores, indent = 4, ensure_ascii= False))
         if save_path:
-            with open(save_path, mode = 'w', encoding = 'utf-8') as file:
-                json.dump(self.evaluation_scores, file, indent = 4, ensure_ascii= False)
-            print(f"Degerlendirme Sonuclari Kaydedildi. Dosya Yolu: {save_path}")
-        
+            try:
+                with open(save_path, mode = 'w', encoding = 'utf-8') as file:
+                    json.dump(self.evaluation_scores, file, indent = 4, ensure_ascii= False)
+                print(f"Degerlendirme Sonuclari Kaydedildi. Dosya Yolu: {save_path}")
+            except Exception as err:   
+                print(f"Degerlendirme Sonuclari Kaydedilirken Hata Olustu: {err}")
