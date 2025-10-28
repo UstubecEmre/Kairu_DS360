@@ -114,6 +114,7 @@ class FraudDetectionPipeline():
             "data": {
                 'test_size':0.2
                 ,'random_state': 42
+                ,'raw_data_path': 'data/raw/creditcard_fraud.csv'
             },
             'preprocessing':{
                 'scaling_method': 'robust'
@@ -352,44 +353,47 @@ class FraudDetectionPipeline():
         # modelleri isim ve parametreleri ile donguye sok
         for model_name, model_params in models_config.items():
             logger.info(f"{model_name} modeli egitiliyor")
+            with mlflow.start_run(nested= True):
             
-            
-            if model_name == 'random_forest':
-                model = RandomForestClassifier(**model_params)
-            
-            elif model_name == 'logistic_regression':
-                model = LogisticRegression(**model_params)
-            
-            elif model_name == 'lof':
-                model = LocalOutlierFactor(**model_params)
+                if model_name == 'random_forest':
+                    model = RandomForestClassifier(**model_params)
                 
-            elif model_name == 'isolation_forest':
-                model = IsolationForest(**model_params)
-            else:
-                logger.warning(f"Gecersiz Bir Model Ismi Girdiniz")
-                continue # program hata vermeden devam etsin.
-            
-            # Aykiri deger tespiti icin LocalOutlierFactor ve IsolationForest
-            if model_name in ['lof', 'isolation_forest']:
-                model.fit(self.X_train_balanced)  #dengeli veri ile egit
-            else:
-                model.fit(self.X_train_balanced, self.y_train_balanced)   
+                elif model_name == 'logistic_regression':
+                    model = LogisticRegression(**model_params)
                 
-            self.models[model_name] = model
-            
-            if model_name not in ['lof', 'isolation_forest']: # RandomForestClassifier, LogisticRegression
-                # Capraz dogrulama yap
-                cv_scores = cross_val_score(
-                    model,
-                    self.X_train_balanced,
-                    self.y_train_balanced,
-                    cv = 5, # 10 da yapilabilir
-                    scoring = 'roc_auc'
-                )
-            mlflow.log_metric(f"{model_name}_cross_validation_roc_auc_mean", cv_scores.mean())
-            mlflow.log_metric(f"{model_name}_cross_validation_roc_auc_std", cv_scores.std())    
-            
-            logger.info(f"{model_name} Modelinin Capraz Dogrulama ROC-AUC Egri Basari Ortalamasi: {cv_scores.mean():.4f} (+/- {cv_scores.std()*2:.4f})")
+                elif model_name == 'lof':
+                    model = LocalOutlierFactor(**model_params)
+                    
+                elif model_name == 'isolation_forest':
+                    model = IsolationForest(**model_params)
+                else:
+                    logger.warning(f"Gecersiz Bir Model Ismi Girdiniz")
+                    continue # program hata vermeden devam etsin.
+                
+                # Aykiri deger tespiti icin LocalOutlierFactor ve IsolationForest
+                if model_name in ['lof', 'isolation_forest']:
+                    model.fit(self.X_train_balanced)  #dengeli veri ile egit
+                else:
+                    model.fit(self.X_train_balanced, self.y_train_balanced)   
+                    
+                self.models[model_name] = model
+                
+                if model_name not in ['lof', 'isolation_forest']: # RandomForestClassifier, LogisticRegression
+                    # Capraz dogrulama yap
+                    cv_scores = cross_val_score(
+                        model,
+                        self.X_train_balanced,
+                        self.y_train_balanced,
+                        cv = 5, # 10 da yapilabilir
+                        scoring = 'roc_auc'
+                    )
+                    mlflow.log_metric(f"{model_name}_cross_validation_roc_auc_mean", cv_scores.mean())
+                    mlflow.log_metric(f"{model_name}_cross_validation_roc_auc_std", cv_scores.std())    
+                    logger.info(f"{model_name} Modelinin Capraz Dogrulama ROC-AUC Egri Basari Ortalamasi: {cv_scores.mean():.4f} (+/- {cv_scores.std()*2:.4f})")
+
+                else:
+                    mlflow.log_param("unsupervised_model", True)
+                    logger.info(f"{model_name} Modelinin Egitimi Tamamlandi (Denetimsiz Ogrenme ile)")
         
         logger.info("Model Egitimleri Gerceklestirildi")
         
