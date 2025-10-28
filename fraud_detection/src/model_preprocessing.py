@@ -67,10 +67,10 @@ class Feature_Preprocessor:
     def identify_real_data_types(self, dataframe):
         """Ozniteliklerin gercek veri tipini belirler."""
         # for categorical features (Kategorik veriler icin)
-        self.categorical_features = dataframe.select_dtypes(includes = ['object', 'category']).columns.tolist()
+        self.categorical_features = dataframe.select_dtypes(include = ['object', 'category']).columns.tolist()
             
         # for numerical features (sayisal veriler icin)
-        self.numerical_features = dataframe.select_dtypes(includes = ['float64', 'int64']).columns.tolist()
+        self.numerical_features = dataframe.select_dtypes(include = ['float64', 'int64']).columns.tolist()
             
         logger.info(f"Kategorik Degisken Sayisi: {len(self.categorical_features)}")
         logger.info(f"Sayisal Degisken Sayisi: {len(self.numerical_features)}")
@@ -95,7 +95,7 @@ class Feature_Preprocessor:
                 )
             except Exception as err:
                 logger.error(f"Beklenmeyen Bir Hata Olustu. Sayisal Degiskenler Doldurulamadi: {err}")
-                return False 
+                return df_processed 
         
         # to fill for categorical features (kategorik degiskenleri doldurmak icin)
         if hasattr(self, 'categorical_features') and self.categorical_features:    
@@ -106,7 +106,7 @@ class Feature_Preprocessor:
                 )
             except Exception as err:
                 logger.error("Sayisal Degiskenler Medyan Degerleriyle; Kategorik Degiskenler Mod Ile Dolduruldu")
-                return False
+                return df_processed
         logger.info(f"Sayisal Degiskenler {numerical_strategy} ile dolduruldu")
         logger.info(f"Kategorik Degiskenler {categorical_strategy} ile dolduruldu")
         
@@ -459,13 +459,13 @@ class ImbalanceHandler:
     
     @staticmethod
     def apply_smotetomek(X, y, sampling_strategy = 'auto', random_state = 42):
-        smotemek = SMOTETomek(sampling_strategy = sampling_strategy, random_state= random_state)
-        X_resampled, y_resampled = smotemek.fit_resample(X,y)
+        smotetomek = SMOTETomek(sampling_strategy = sampling_strategy, random_state= random_state)
+        X_resampled, y_resampled = smotetomek.fit_resample(X,y)
         logger.info(f"SMOTETomek Methodu Uygulandi: {len(X)} -> {len(X_resampled)}")
         return X_resampled, y_resampled
 
 
-def demo_preprocessing(data_path =Path(r"D:\Kairu_DS360_Projects\fourth_week_project\fraud_detection\data\anomaly_scores_raw.csv")):
+def demo_preprocessing(data_path =Path(r"D:\Kairu_DS360_Projects\fourth_week_project\fraud_detection\data\raw\creditcard_fraud.csv")):
     """Islenmis egitim ve test veri setini kaydeder, opsiyonel olarak dengesiz veri setini dengeli hale getirir """
     try:
         fraud_df = pd.read_csv(data_path)
@@ -509,19 +509,19 @@ def demo_preprocessing(data_path =Path(r"D:\Kairu_DS360_Projects\fourth_week_pro
     preprocessor = Feature_Preprocessor(scaling_method= 'robust', encoding_method= 'onehot')
     
     # X_train_processed
-    X_train_processed = preprocessor.fit_transform_model(
+    X_train_processed_with_y, _ = preprocessor.fit_transform_model(
         pd.concat([X_train, y_train.rename('Class')], axis = 1), target_col = "Class"
     )
-    y_train_processed = X_train_processed['Class'].astype(int)
-    X_train_processed = X_train_processed.drop('Class', axis=1)
+    y_train_processed = X_train_processed_with_y['Class'].astype(int)
+    X_train_processed = X_train_processed_with_y.drop('Class', axis=1)
     
-    # transform 
-    X_test_processed = preprocessor.transform_model(
+    # transform => tuple dondurur
+    X_test_processed_with_y, _ = preprocessor.transform_model(
         pd.concat([X_test,  y_test.rename('Class')], axis = 1)
         ,target_col = 'Class'
     )
-    y_test_processed = X_test_processed['Class'].astype(int)
-    X_test_processed = X_test_processed.drop(columns = 'Class', axis = 1)
+    y_test_processed = X_test_processed_with_y['Class'].astype(int)
+    X_test_processed = X_test_processed_with_y.drop(columns = 'Class', axis = 1)
     
     print(f"Islenmis Veri Setinin Egitim Seti Boyutu: {X_train_processed.shape}")
     print(f"Islenmis Veri Setinin Test Seti Boyutu: {X_test_processed.shape}")
