@@ -165,6 +165,11 @@ class FraudDetectionPipeline():
     def load_fraud_data_from_kagglehub(self, synthetic = False, data_path = None, download_with_kagglehub = False):
         
         """download_with_kagglehub argumani True ise kagglehub uzerinden fraud detection veri setini yukler"""
+        fraud_data = None 
+        # configuration dosyasindan parametreleri al
+        DEFAULT_DATA_PATH = Path(self.config['data']['raw_data_path'])
+        
+        
         if download_with_kagglehub:
             logger.info("KaggleHub Uzerinden Dolandiricilik Tespiti (Fraud Detection) Veri Seti Indiriliyor")
             
@@ -182,15 +187,25 @@ class FraudDetectionPipeline():
             except Exception as err:
                 logger.error(f"KaggleHub Uzerinden Indirme Basarisiz: {err}")  
                 #Dileyen yapay veri ureterek bu islemleri gerceklestirebilir, Program askida kalmaz.
-        else:
-            try:
-                fraud_data = pd.read_csv(data_path)
-                logger.info(f"Local'deki Yol Uzerinden Veri Seti Indiriliyor")
-            except FileNotFoundError:
-                logger.error("Dosya Yolu Bulunamadi. Lutfen Dosya Yolunu Kontrol Ediniz!!!")
-            except Exception as err:
-                logger.error(f"Beklenmeyen Bir Hata Olustu: {err}")
+        if fraud_data is None:
+            path_to_use = data_path if data_path is not None else DEFAULT_DATA_PATH
+            
+            if path_to_use is None:
+                logger.error("Lutfen Gecerli Bir Veri Dosyasi Yolu Belirleyiniz")
+            else:
+                try:
+                    fraud_data = pd.read_csv(path_to_use)
+                    logger.info(f"Veri Seti Yuklendi. Veri Seti Boyutu: {fraud_data.shape}")
+                except FileNotFoundError:
+                    logger.error(f"Veri Dosyasi Bulunamadi. Lutfen Gecerli Bir Yol Belirleyiniz: {path_to_use}")
+                except Exception as err:
+                    logger.error(f"Veri Yukleme Sirasinda Beklenmeyen Hata Olustu: {err}")
         
+        if fraud_data is None:
+            if synthetic:
+                raise ValueError("Yapay Veri Uretimi Mevcut Degildir.")
+            else:
+                raise ValueError("Veri Seti Yuklenemedi. Lutfen Gecerli Bir Veri Dosyasi Yolu Belirleyiniz")
         # veri setini incele
         self._validate_data(fraud_data)
         
@@ -200,8 +215,8 @@ class FraudDetectionPipeline():
         y = fraud_data['Class']
         
         
-        test_size = self.config['fraud_data']['test_size']
-        random_state = self.config['fraud_data']['random_state']
+        test_size = self.config['data']['test_size']
+        random_state = self.config['data']['random_state']
         
         # train test split
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
@@ -209,12 +224,12 @@ class FraudDetectionPipeline():
             y,
             test_size= test_size,
             random_state=random_state,
-            stratify = y if self.config['fraud_data'].get('stratify', True) else None 
+            stratify = y if self.config['data'].get('stratify', True) else None 
         )    
 
         logger.info(f"Veri Seti Yuklendi. Egitim Seti Boyutu: {len(self.X_train)}\nTest Seti Boyutu: {len(self.X_test)}")
         logger.info(f"Sinif Dagilimlari:\n Egitim Seti Orani: {np.bincount(self.y_train)}\nTest Seti: {np.bincount(self.y_test)}")
-        
+        return fraud_data
     
     def _validate_data(self, data):
         """Veri setinin kalitesini ve dogrulunu test eder"""
@@ -246,7 +261,7 @@ class FraudDetectionPipeline():
                 logger.error(f"Beklenen Degerler Icerisinde Yer Almamaktadir. Beklenen Aralik: [{min_amount}, {max_amount}]")
                 
         logger.info("Veri Dogrulama Gerceklestirildi")
-    
+        
     
     def preprocess_data(self):
         """Veri on isleme adimlarini gerceklestirir. Scaling, encoding..."""
