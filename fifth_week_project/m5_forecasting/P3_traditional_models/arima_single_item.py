@@ -178,3 +178,83 @@ class ARIMAModelSingleItemForecaster:
         print(f"Optimal d Degeri Bulunamadi, d = 1 Olarak Belirlenecektir")
         return 1
     
+    def grid_search_arima(self, max_p = 2, max_q = 2):
+        """ARIMA Yontemi Icin Parametrelerin Grid Search Kullanilarak Optimize Edilmesi"""
+        print("ARIMA Grid Search Islemi Gerceklestiriliyor...")
+        
+        d = self.determine_d_parameter()
+        
+        # grid search icin parametreler
+        p_values = range(0, max_p + 1)
+        q_values = range(0, max_q + 1)
+        
+        print(f"p Degerleri: {list(p_values)}")
+        print(f"q Degerleri: {list(q_values)}")
+        print(f"Kullanilan d Degeri: {d}")
+        
+        
+        best_aic = float('inf')
+        best_params = None
+        results = [] 
+
+        
+        total_combinations = len(q_values) * len(p_values)
+        current_combination = 0
+        
+        for p in p_values:
+            for q in q_values:
+                current_combination += 1
+                try:
+                    print(f"ARIMA Yontemi Icin ({p}, {q}, {d}) Parametreleri Deneniyor... ({current_combination}/{total_combinations}")
+                    # modeli egitelim
+                    model = ARIMA(self.train_series, order = (p, q, d))
+                    fitted_model = model.fit()
+                    
+                    aic = fitted_model.aic
+                    bic = fitted_model.bic
+                    
+                    results.append(
+                        {
+                            'p':p
+                            ,'d': d
+                            ,'q': q
+                            ,'AIC': aic
+                            ,'BIC': bic
+                            ,'converged': fitted_model.mle_retvals['converged'] if hasattr(fitted_model, 'mle_retvals') else True
+                            
+                        }
+                    )
+                    
+                    if aic < best_aic:
+                        best_aic = aic
+                        best_params = (p, d, q)
+                        print(f"En Iyi AIC = {aic:.4f}")
+                except Exception as err:
+                    print(f"Beklenmeyen Bir Hata Olustu: {str(err)[:25]}")
+                    results.append(
+                        {
+                            'p': p
+                            ,'q': q
+                            ,'d' : d
+                            ,'AIC': np.inf
+                            ,'BIC': np.inf
+                            ,'converged': False
+                            
+                        }
+                    )
+        # DataFrame'e donusturelim
+        results_df = pd.DataFrame(results)
+        print("Grid Search Sonuclari Gosteriliyor...")
+        print(f"En Iyi Parametreler: ARIMA{best_params}")
+        print(f"En Iyi AIC Degeri: {best_aic:.4f}")
+        
+        # En iyi 3 sonuc
+        top_results = results_df[results_df['converged']].nsmallest(3, 'AIC')
+        print("En Iyi 3 Model")
+        
+        
+        for idx, (_, row) in enumerate(top_results.iterrows(), 1):
+            print(f"{idx}. ARIMA({int(row['p'])},{int(row['d'])},{int(row['q'])}) - AIC: {row['AIC']:.2f}")
+        
+        self.best_params = best_params
+        return best_params, results_df
