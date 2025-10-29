@@ -120,6 +120,61 @@ class ARIMAModelSingleItemForecaster:
             raise Exception(f"Beklenmeyen Bir Hata Olustu: {err}")
                
         return self.ts_data
+    
+    
+    def test_stationarity(self, series, title = 'Series'):
+        """Stationarity (ADF) Test Uygular"""
       
-      
+        print(f"{title} Icin Stationarity Test Gerceklesitiriliyor...")
         
+        adf_result = adfuller(series.dropna())
+        print(f"ADF Istatistikleri: {adf_result[0]:.6f}")
+        print(f"p-Degeri: {adf_result[1]:.6f}")
+        print(f"Kritik Degerler: ")
+        for key, value in adf_result[4].items():
+            print(f"{key}: {value:.4f}")
+            
+        # Sonuc yorumu
+        if adf_result[1] <= 0.05:
+            print(f"Duragan (Stationary) p-Degeri < 0.05")
+            is_stationary = True
+        else:
+            print(f"Duragan Degil (Non-Stationary) p-Degeri > 0.05")
+            is_stationary = False
+            
+        return {"is_stationary": is_stationary, "p_value": adf_result[1], "adf_stat": adf_result[0]}
+
+    
+    
+    def determine_d_parameter(self):
+        """d(Differencing order) parametresini belirle"""
+        print("ARIMA Yontemi Icin d Parametresi Belirleniyor")
+        
+        series = self.train_series.copy()
+        d = 0
+        max_d =  2 # maksimum 2 kez 
+        
+        # orijinal serinin duraganligini test edelim
+        is_stationary, p_value = self.test_stationarity(series, f'Orijinal: (d = {d})')
+        
+        # duragansa
+        if is_stationary:
+            print(f"{d} Parametre Ayari Gerekmiyor. Duragan...")
+            return d
+        
+        
+        for d in range(1, max_d + 1):
+            diff_series = series.diff(d).dropna()
+            
+            if len(diff_series) < 50:
+                print(f"d = {d} Degeri Icin Yeterli Veri Kalmamaktadir. d = {d - 1} Kullanilacaktir")
+                return d - 1
+            
+            is_stationary, p_value = self.test_stationarity(diff_series,f"Ayarlanan d degeri: {d}")
+            if is_stationary:
+                print(f"d Degeri Olarak {d} Belirlendi")
+                return d
+        
+        print(f"Optimal d Degeri Bulunamadi, d = 1 Olarak Belirlenecektir")
+        return 1
+    
