@@ -78,3 +78,48 @@ class ARIMAModelSingleItemForecaster:
             raise FileNotFoundError("Egitim verisi bulunamadi. Lutfen create_m5_subset.py Kullanarak Veri Setini Hazirlayin.")
 
         return self.item_id
+    
+    def load_time_series(self):
+        """Secilen urun icin zaman serisi verisini yukler."""
+        print(f"[INFO] Zaman Serisi Verisi Yukleniyor: {self.item_id}")
+        try:
+            # egitim verisini yukleyelim
+            train_df = pd.read_csv(r"D:\Kairu_DS360_Projects\fifth_week_project\m5_forecasting\artifacts\datasets\train.csv")
+            valid_df = pd.read_csv(r"D:\Kairu_DS360_Projects\fifth_week_project\m5_forecasting\artifacts\datasets\validation.csv")
+        # secilen urunun zaman serisi verisini alalim
+        
+            item_train = train_df[train_df['item_id'] == self.item_id]['sales'].copy()
+            item_valid = valid_df[valid_df['item_id'] == self.item_id]['sales'].copy()
+            
+            print(f"Egitim Verisi Zaman Araligi: {item_train.index.min()} - {item_train.index.max()}")
+            print(f"Dogrulama Verisi Zaman Araligi: {item_valid.index.min()} - {item_valid.index.max()}")
+            print(f"Egitim Verisi Gun Sayisi: {len(item_train)}")
+            print(f"Dogrulama Verisi Gun Sayisi: {len(item_valid)}")
+            
+            
+            # Serilerimizi koruyalim
+            self.train_series = item_train
+            self.valid_series = item_valid
+            
+            # Verilerimizi birlestirelim
+            self.ts_data = pd.concat([item_train, item_valid])
+            
+            print(f"[INFO] Toplam Gunluk Veri Sayisi: {len(self.ts_data)}")
+            
+            print("Temel Istatistik Bilgileri Getiriliyor...")
+            print(f"Ortalama: {self.train_series.mean():.4f}")
+            print(f"Standart Sapma: {self.train_series.std():.4f}")
+            print(f"En Dusuk Satis: {self.train_series.min()}")
+            print(f"En Yuksek Satis: {self.train_series.max()}")
+            print(f"Hic Satis Yapilmayan Gun Sayisi: {(self.train_series == 0).sum()}")
+
+        except FileNotFoundError:
+            raise FileNotFoundError("Belirtilen Dosya Yollarinda Ilgili Klasorler Bulunamadi!!!")
+        
+        except Exception as err:
+            raise Exception(f"Beklenmeyen Bir Hata Olustu: {err}")
+               
+        return self.ts_data
+      
+      
+        
