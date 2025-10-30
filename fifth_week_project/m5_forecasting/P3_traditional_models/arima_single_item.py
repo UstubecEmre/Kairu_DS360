@@ -513,60 +513,119 @@ class ARIMAModelSingleItemForecaster:
             plt.close()
             
             
-        def save_results(self):
-            """Sonuclari Kaydeder"""
-            print("Model Sonuclariniz Models Klasorune Kaydediliyor...")
-            model_path = f'{self.artifact_path}/models/arima_{self.item_id}.pkl'
+    def save_results(self):
+        """Sonuclari Kaydeder"""
+        print("Model Sonuclariniz Models Klasorune Kaydediliyor...")
+        model_path = f'{self.artifact_path}/models/arima_{self.item_id}.pkl'
             
-            with open(model_path, 'wb') as file:
-                pickle.dump(
-                    {
-                        'model':self.model
-                        ,'item_id': self.item_id
-                        ,'best_params': self.best_params
-                        ,'train_series': self.train_series
-                        ,'metrics': self.metrics
-                    }
-                    ,file 
-                )
-            print(f"Modeller {model_path} Dosya Yoluna Kaydedildi")
-            
-            # Tahminleri kaydet
-            forecast_df = pd.DataFrame(
+        with open(model_path, 'wb') as file:
+            pickle.dump(
                 {
-                    'date': self.forecast.index
+                    'model':self.model
                     ,'item_id': self.item_id
-                    ,'forecast': self.forecast.values
-                    ,'actual': self.valid_series.values[:len(self.forecast)]
+                    ,'best_params': self.best_params
+                    ,'train_series': self.train_series
+                    ,'metrics': self.metrics
                 }
+                ,file 
             )
+        print(f"Modeller {model_path} Dosya Yoluna Kaydedildi")
             
-            pred_path = f'{self.artifacts_path}/preds/arima_forecast_{self.item_id}.csv'
-            forecast_df.to_csv(pred_path, index = False)
-            print(f"Tahminler {pred_path} Dosya Yoluna Kaydedildi")
-            
-            
-            # ozet rapor olusturalim
-            report = {
-                'item_id': self.item_id
-                ,'model_type': 'ARIMA'
-                ,'params': self.best_parameters
-                ,'train_period': f"{self.train_series.index.min()} to {self.train_series.index.max()}"
-                ,'valid_period': f"{self.valid_series.index.min()} to {self.valid_series.index.max()}"
-                ,'forecast_steps': len(self.forecast)
-                ,'metrics': self.metrics
-                ,'model_aic': self.model.aic
-                ,'model_bic': self.model.bic
+        # Tahminleri kaydet
+        forecast_df = pd.DataFrame(
+            {
+                'date': self.forecast.index
+                ,'item_id': self.item_id
+                ,'forecast': self.forecast.values
+                ,'actual': self.valid_series.values[:len(self.forecast)]
             }
+        )
             
-            import json
-            report_path = f"{self.artifacts_path}/preds/arima_report_{self.item_id}.json"
-            with open(report_path, 'w') as file:
-                json.dump(
-                    report
-                    ,file
-                    ,indent = 4
-                    ,default= str
-                )
-            print(f"Ozet Rapor Olusturuldu. {report_path} Dosya Yolundan Goz Atabilirsiniz")
+        pred_path = f'{self.artifacts_path}/preds/arima_forecast_{self.item_id}.csv'
+        forecast_df.to_csv(pred_path, index = False)
+        print(f"Tahminler {pred_path} Dosya Yoluna Kaydedildi")
             
+            
+        # Ozet rapor olusturalim
+        report = {
+            'item_id': self.item_id
+            ,'model_type': 'ARIMA'
+            ,'params': self.best_parameters
+            ,'train_period': f"{self.train_series.index.min()} to {self.train_series.index.max()}"
+            ,'valid_period': f"{self.valid_series.index.min()} to {self.valid_series.index.max()}"
+            ,'forecast_steps': len(self.forecast)
+            ,'metrics': self.metrics
+            ,'model_aic': self.model.aic
+            ,'model_bic': self.model.bic
+        }
+            
+        import json
+        report_path = f"{self.artifacts_path}/preds/arima_report_{self.item_id}.json"
+        with open(report_path, 'w') as file:
+            json.dump(
+                report
+                ,file
+                ,indent = 4
+                ,default= str
+            )
+        print(f"Ozet Rapor Olusturuldu. {report_path} Dosya Yolundan Goz Atabilirsiniz")
+            
+    # Tek bir cati altinda toplayalim
+    def run_arima_pipeline(self):
+        """ARIMA Modeli Icin Pipeline Uygular"""
+        try:
+            # En yuksek satisa sahip urunu getir
+            self.select_top_item()
+            
+            # Zaman serisi olustur
+            self.load_time_series()
+            
+            # Parametre optimizasyonu gerceklestir
+            best_params, grid_results = self.grid_search_arima()
+            
+            
+            # Modeli egitelim
+            self.train_arima_model()
+            
+            
+            # Tahmin yaptiralim
+            self.make_forecast()
+            
+            # Gercek deger ile tahmin degerleri arasi farklari degerlendirelim
+            self.calculate_metrics()
+            
+            
+            # Sonuclari gorsellestirelim
+            self.create_visualizations()
+            
+            # Metrik ve gorsellestirme sonuclarini kaydedelim
+            self.save_results()
+            
+            print(f"ARIMA Modeli Icin Tahminleme Gerceklestirildi")
+            print("Hizli Goz Atis Gerceklestiriliyor...")
+            print(f"Kullanilan Model Ismi: ARIMA{self.best_params}")
+            print(f"Kullanilan Urun: {self.item_id}")
+            print(f"Simetrik Ortalama Mutlak Yuzde Hata: {self.metrics['sMAPE']:.4f}%")
+            print(f"Ciktilarin Kaydedildigi Dosya Yolu: {self.artifacts_path}/")
+            return  self.model, self.forecast, self.metrics
+            
+        except Exception as err:
+            raise Exception(f"Pipeline Sirasinda Beklenmeyen Hata Olustu: {err}")
+
+
+def main():
+    """Ana Fonksiyonumuz"""
+    print("ARIMA Modeli Kullanilarak Tek Urun Satis Tahmini Gerceklestiriliyor...")
+    try:
+        forecaster = ARIMAModelSingleItemForecaster()
+        # model icin adimlari tek bir catida calistir
+        model, forecast, metrics = forecaster.run_arima_pipeline()
+        print("Tek Urun Tahminlemesi Basariyla Gerceklestirildi")
+    except KeyboardInterrupt:
+        print(f"Uygulama Kullanici Tarafindan Durduruldu")
+    
+    except Exception as err:
+        raise Exception(f"ARIMA Tahminlemesinde Beklenmeyen Hata Olustu: {err} ")
+    
+if __name__ == '__main__':
+    main()
