@@ -258,3 +258,315 @@ class ARIMAModelSingleItemForecaster:
         
         self.best_params = best_params
         return best_params, results_df
+    
+    
+    def train_arima_model(self):
+        """ARIMA Modelini Egitir"""
+        print(f"En Iyi Parametreler Kullanilarak ARIMA{self.best_params} Modeli Egitiliyor...")
+        try:
+            # modeli egitelim
+            model = ARIMA(self.train_series, order = self.best_params)
+            self.model = model.fit()
+            print("Model Egitimi Basariyla Gerceklestirildi")
+            print(f"AIC: {self.model.aic:.4f}")
+            print(f"BIC: {self.model.bic:.4f}")
+            print(f"Log Likelihood Yontemiyle: {self.model.llf:.4f}")
+            
+            print("Model Parametreleri")
+            if hasattr(self.model, 'params'):
+                for param_name, param_value in self.model.params.items():
+                    print(f"{param_name} parametresinin degeri: {param_value}")
+        except Exception as err:
+            raise Exception(f"Model Egitimi Sirasinda Beklenmeyen Bir Hata Olustu: {err}")
+    
+    def make_forecast(self, forecast_steps = 28):
+        """28 Gunluk Tahmin Gerceklestirir"""
+        print(f"{forecast_steps} Gunluk Tahmin Basliyor...")
+        try:
+            forecast_result = self.model.forecast(steps = forecast_steps)
+            
+            # guven araliginda calis
+            try:
+                forecast_ci = self.model.get_forecast(steps = forecast_steps).conf_int()
+                forecast_lower = forecast_ci.iloc[:, 0]
+                forecast_upper = forecast_ci.iloc[:, 1]
+            except:
+                forecast_lower = None
+                forecast_upper = None 
+            
+            # Tarih araligi olusturalim
+            last_date = self.train_series.index[-1]
+            forecast_dates = pd.date_range(start = last_date + timedelta(days = 1)
+                                           ,periods = forecast_steps
+                                           ,freq= 'D')
+            
+            # Tahmin gerceklestirelim
+            self.forecast = pd.Series(forecast_result, index = forecast_dates)
+            
+            # Eger negatif deger varsa 0 yap
+            self.forecast = self.forecast.clip(lower = 0)
+            
+            print("Tahminlerle Ilgili Ozet Istatistikler Getiriliyor...")
+            print(f"{forecast_steps} Gunluk Tahmin Gerceklestirildi")
+            print(f"Tahmin Araliklari: {self.forecast.index.min()} - {self.forecast.index.max()}")
+            print(f"Ortalama Tahmin Degeri: {self.forecast.mean():.4f}")
+            print(f"Minimum Tahmin Degeri: {self.forecast.min():.4f}")
+            print(f"Maksimum Tahmin Degeri: {self.forecast.max():.4f}")
+            
+            return self.forecast, forecast_lower, forecast_upper
+        
+        except Exception as err:
+            raise Exception(f"Tahminleme Sirasinda Beklenmeyen Hata Olustu: {err}")
+        
+    
+    
+    def calculate_metrics(self):
+        """MAE, MSE Degerlerini Hesaplar"""
+        print("Tahmi Metrikleri Hesaplaniyor...")
+        
+        
+        # Gercek ve Tahmin Degerleri
+        y_true = self.valid_series.values
+        y_pred = self.forecast.values
+        
+        # Uzunluklarini esitlememiz gerekmektedir.
+        min_len = min(len(y_true), len(y_pred))
+        y_true = y_true[:min_len]
+        y_pred = y_pred[:min_len]
+        
+        # Metrikler (Mean Absolute Error - Root Mean Square Error)
+        mae = mean_absolute_error(y_true, y_pred)
+        rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+        
+        
+        # MAPE (Mean Absolute Percentage Error)
+        mask = y_true != 0
+        if mask.sum() > 0:
+            mape = np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100
+        else:
+            mape = float("inf")
+        
+        
+        #sMAPE
+        denominator = (np.abs(y_true) + np.abs(y_pred)) / 2
+        mask = denominator != 0
+        if mask.sum() > 0:
+            smape = np.mean(np.abs(y_true[mask] - y_pred[mask]) / denominator[mask]) * 100
+        else:
+            smape = float('inf')
+        
+        self.metrics = {
+            "MAE": mae
+            ,"RMSE": rmse
+            ,"MAPE": mape
+            ,"sMAPE": smape
+        }
+        
+        print("Tahmin Degerlendirmesi Gerceklestiriliyor...")
+        print(f"Ortalama Mutlak Hata (MAE): {mae:.4f}")
+        print(f"Kok Ortalama Kare Hata (RMSE): {rmse:.4f}")
+        print(f"Ortalama Mutlak Yuzde Hata (MAPE): {mape:.4f}")
+        print(f"Simetrik Ortalama Mutlak Yuzde Hata (sMAPE): {smape:.4f}")
+        
+        return self.metrics
+    
+    
+    def create_visualizations(self):
+        """Gorsellestirmeleri Gerceklestirir"""
+        print("Gorsellestirme Islemi Baslatiliyor...")
+        fig, axes = plt.subplots(2, 2, figsize = (12, 8))
+        
+        # Ana tahmin
+        axs1 = axes[0, 0]
+        train_plot = self.train_series.tail(100)
+        
+        axs1.plot(train_plot.index
+                  ,train_plot.values
+                  ,label = 'Gercek Egitim Verileri'
+                  ,color = 'skyblue'
+                  ,ilnewidth = 1.5)
+        
+        axs1.plot(self.valid_series.index
+                  ,self.valid_series.values
+                  ,label = 'Gercek Dogrulama Verileri'
+                  ,color = 'forestgreen'
+                  ,linewidth = 1.5)
+        
+        axs1.plot(self.forecast.index
+                  ,self.forecast.values
+                  ,label = "ARIMA Model Tahmini"
+                  ,color = "maroon"
+                  ,linewidth = 1.5
+                  ,linestyle = "--")
+        
+        
+        axs1.axvline(x=self.train_series.index[-1], color='gray', linestyle=':', alpha=0.6, 
+                   label='Egitim ve Dogrulama Ayrimi')
+        
+        axs1.set_title(f'ID Degeri {self.item_id} - ARIMA{self.best_params} Tahmini', fontweight='bold')
+        axs1.set_ylabel('Satislar')
+        axs1.legend()
+        axs1.grid(True, alpha=0.4)
+        
+        
+        # 2. Residuals (artıklar)
+        axs2 = axes[0, 1]
+        residuals = self.model.resid
+        axs2.plot(
+            residuals.index
+            ,residuals.values
+            ,color = 'orange'
+            ,alpha = 0.6
+        )
+        axs2.axhilne(
+            y = 0
+            ,color = 'black'
+            ,linestyle = '-'
+            ,alpha = 0.7
+        )
+        axs2.set_title("Residuals (Artiklar)", fontsize = 16, fontweight = 'bold')
+        axs2.set_ylabel("Artik Degeri")
+        axs2.grid(True, alpha = 0.2)
+        
+        # Artik degerleri icin ACF
+        axs3 = [1, 0]
+        try:
+            plot_acf(residuals.dropna()
+                     ,ax = axs3
+                     ,lags = 20
+                     ,alpha = 0.04)
+            axs3.set_title("Artik Degerler Icin ACF", fontsize = 16, color = 'black', fontweight = 'bold')
+        except:
+            axs3.text(0.5
+                      ,0.5
+                      ,'Deger Hesaplanamadi'
+                      ,ha = 'center'
+                      ,va = 'center'
+                      ,transform = axs3.transAxes)
+            axs3.set_title("Artiklar Icin ACF Hesaplama Hatasi"
+                           ,color = 'maroon'
+                           ,fontweight = 'bold')
+        
+        #Artiklar icin PACF 
+        axs4 = [1, 1]
+        try:
+            plot_pacf(residuals.dropna()
+                      ,ax = axs4
+                      ,lags = 20
+                      ,alpha = 0.04)
+            axs4.set_title("Artiklar Icin PACF", fontweight = 'bold')
+        except:
+            axs4.text(
+                0.5
+                ,0.5
+                ,'PACF Hesaplanamadi'
+                ,ha = 'center'
+                ,va = 'center'
+                ,transform = axs4.transAxes
+            )
+            axs4.set_title('Artiklar Icin PACF Hesaplamasinda Hata Olustu'
+                           ,color = 'maroon'
+                           ,fontweight = 'bold')
+            
+            plt.tight_layout()
+            
+            # Kaydedelim
+            figure_path = f'{self.artifacts_path}/figures/arima_{self.item_id}_forecast.png'
+            plt.savefig(figure_path, dpi = 300, bbox_inches = 'tight')
+            print(f"Tahmin Grafikleri Kaydedildi: {figure_path} Dosya Yolunda Bulabilirsiniz...")
+            plt.close()
+            
+            
+            # Metrikleri gorsellestirelim
+            fig, axs = plt.subplots(1, 1, figsize = (10, 8))
+            
+            metrics_names =  ['MAE','RMSE', 'sMAPE (%)']
+            metrics_values = [self.metrics['MAE'], self.metrics['RMSE'], self.metrics['sMAPE']]
+            
+            bars = axs.bar(metrics_names
+                           ,metrics_values
+                           ,color=['darkblue', 'coral', 'forestgreen'])
+            
+            
+            # Bar grafik uzerine yazdiralim
+            for bar, value in zip(bars, metrics_values):
+                axs.text(
+                    bar.get_x() + bar.get_width() / 2
+                    ,bar.get_height() + 0.1
+                    ,f'{value:.4f}'
+                    ,ha = 'center'
+                    ,va = 'bottom'
+                    ,fontweight = 'bold'
+                    ,color = 'black'
+                )            
+            axs.set_title(f"{self.item_id} ID'li ARIMA{self.best_params} Icin Performans Metrikleri"
+                          ,fontsize = 16
+                          ,fontweight = 'bold')
+            axs.set_ylabel('Degerlendirme Metrik Degerleri')
+            axs.grid(True, alpha = 0.2)
+            plt.tight_layout()
+            
+            # Bunlari klasore kaydedelim
+            metrics_path = f'{self.artifacts_path}/figures/arima_{self.item_id}_metrics.png'
+            plt.savefig(metrics_path, dpi = 300, bbox_inches = 'tight')
+            print(f"Metrik Grafikleri Kaydedildi. Goz Atmak Icin: {metrics_path}")
+            plt.close()
+            
+            
+        def save_results(self):
+            """Sonuclari Kaydeder"""
+            print("Model Sonuclariniz Models Klasorune Kaydediliyor...")
+            model_path = f'{self.artifact_path}/models/arima_{self.item_id}.pkl'
+            
+            with open(model_path, 'wb') as file:
+                pickle.dump(
+                    {
+                        'model':self.model
+                        ,'item_id': self.item_id
+                        ,'best_params': self.best_params
+                        ,'train_series': self.train_series
+                        ,'metrics': self.metrics
+                    }
+                    ,file 
+                )
+            print(f"Modeller {model_path} Dosya Yoluna Kaydedildi")
+            
+            # Tahminleri kaydet
+            forecast_df = pd.DataFrame(
+                {
+                    'date': self.forecast.index
+                    ,'item_id': self.item_id
+                    ,'forecast': self.forecast.values
+                    ,'actual': self.valid_series.values[:len(self.forecast)]
+                }
+            )
+            
+            pred_path = f'{self.artifacts_path}/preds/arima_forecast_{self.item_id}.csv'
+            forecast_df.to_csv(pred_path, index = False)
+            print(f"Tahminler {pred_path} Dosya Yoluna Kaydedildi")
+            
+            
+            # ozet rapor olusturalim
+            report = {
+                'item_id': self.item_id
+                ,'model_type': 'ARIMA'
+                ,'params': self.best_parameters
+                ,'train_period': f"{self.train_series.index.min()} to {self.train_series.index.max()}"
+                ,'valid_period': f"{self.valid_series.index.min()} to {self.valid_series.index.max()}"
+                ,'forecast_steps': len(self.forecast)
+                ,'metrics': self.metrics
+                ,'model_aic': self.model.aic
+                ,'model_bic': self.model.bic
+            }
+            
+            import json
+            report_path = f"{self.artifacts_path}/preds/arima_report_{self.item_id}.json"
+            with open(report_path, 'w') as file:
+                json.dump(
+                    report
+                    ,file
+                    ,indent = 4
+                    ,default= str
+                )
+            print(f"Ozet Rapor Olusturuldu. {report_path} Dosya Yolundan Goz Atabilirsiniz")
+            
