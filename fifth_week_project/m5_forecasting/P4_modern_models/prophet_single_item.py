@@ -566,4 +566,72 @@ class ProphetModelSingleItemForecaster():
             except Exception as err:
                 print(f"Kaydetme Sirasinda Hata Olustu: {err}")
         
-              
+    def run_prophet_pipeline(self):
+        """Prophet Icin Pipeline Hatti Olusturur"""
+        try:
+            # Karsilastirma yapilacak ARIMA sonuclarini yukle
+            arima_report = self.load_arima_results()
+            
+            if not self.item_id:
+                print(f"{self.item_id} ID'li Urun Bulunamadi.ARIMA Modelini Calistiriniz")
+                return # fonksiyonu durdur
+            
+            # Zaman serisi yukle
+            self.load_time_series()
+            # Prophet formatina cevir
+            
+            self.prepare_prophet_data()
+            
+            # Prophet model egitimini gerceklestir
+            self.train_prophet_model()
+            
+            # Prophet modeli ile tahmin gerceklestir
+            forecast_period = self.make_prophet_forecast()
+            
+            # Model metriklerini hesapla
+            self.calculate_metrics_and_compare_arima(forecast_period)
+            
+            # Gorsellestirme yap
+            self.calc_visualizations(forecast_period)
+            
+            # Sonuclari kaydet
+            self.save_results()
+
+            print(f"Karsilastirma Tamamlandi. Ozet Raporlara Geciliyor...")
+            print(f"Prophet Model:{self.item_id}")
+            print(f"Prophet Model Simetrik Ortalama Mutlak Yuzdesel Hata: {self.metrics['sMAPE']:.4f}%")
+            
+            if self.arima_metrics:
+                print(f"ARIMA Modeli Simetrik Ortalama Mutlak Yuzdesel Hata: {self.arima_metrics["sMAPE"]:.4f}%")
+                better = "Prophet" if self.metrics['sMAPE'] < self.arima_metrics['sMAPE'] else "ARIMA"
+                print(f"sMAPE Degerlendirme Metrigine Gore Kazanan Model: {better}")
+            print(f"Ciktilar Kaydediliyor. {self.artifacts_path}/ Dosya Yoluna Bakabilirsiniz.")
+            
+            return self.prophet_model, forecast_period, self.metrics
+        
+        except Exception as err:
+            print(f"Prophet Model Pipeline Asamasi Basarisizlikla Sonuclandi: {err}")
+            import traceback
+            print("Uygulamadan Cikiliyor")
+            traceback.print_exc()
+            
+def main():
+    """Ana Fonksiyon"""
+    if not PROPHET_AVAILABLE:
+        print("Prophet Kutuphanesi Kurulu Degil. Lutfen Dahil Ediniz")
+        return
+    
+    try:
+        forecaster = ProphetModelSingleItemForecaster()
+        
+        # pipeline'i calistir
+        model, forecast, metrics = forecaster.run_prophet_pipeline()
+        print("Islem Basariyla Gerceklesti")
+    except KeyboardInterrupt:
+        print("Kullanici Tarafindan Islem Durduruldu")
+    except Exception as err:
+        print(f"Pipeline Sirasinda Beklenmeyen Bir Hata Olustu: {err}")
+
+
+if __name__ == '__main__':
+    main()
