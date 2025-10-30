@@ -73,7 +73,7 @@ class LightGBMModelMultiItemForecaster:
         except Exception as err:
             print(f"Beklenmeyen Bir Hata Olustu: {err}")
             
-    def encoed_categorical_features(self):
+    def encode_categorical_features(self):
         """Kategorik Verileri Sayisal Hale Donusturur"""
         print("Kategorik Ozellikler Sayisal Hale Donusturuluyor...")
         categorical_cols = ['store_id', 'item_id']
@@ -463,8 +463,62 @@ class LightGBMModelMultiItemForecaster:
     
     
     
-                                            
-                
-
+    def run_lightgbm_pipeline(self):
+        """LightGBM Modeli Icin Bastan Sona Bir Pipeline Hazirlar"""
+        try:
+            # Verinin yuklenmesi
+            self.load_feature_data()
             
-                
+            # Verinin hazir hale getirilmesi
+            
+            # encode veya scale islemleri
+            self.encode_categorical_features()
+            
+            X_train, y_train, X_valid, y_valid = self.prepare_features_target()
+            
+            # Modelin egitilmesi
+            self.train_lightgbm_model(X_train, y_train, X_valid, y_valid)
+                        
+            # Modelin Tahminlemesi
+            y_pred_valid = self.calculate_validation_metrics(X_valid, y_valid)
+            
+            self.create_feature_importance_plot()
+            
+            # Modelin degerlendirilmesi icin tahminleme yapilmasi
+            forecast_df = self.iterative_forecast()
+            
+            # Sonuclarin Degerlendirilmesi ve kaydedilmesi
+            self.save_results(forecast_df)
+
+            print(f"Coklu Urun Tahminlemesi LightGBM Modeli Kullanilarak Gerceklestirildi")
+            print(f"Hizli Bir Bakis Icin Ozet Bilgiler Getiriliyor...")
+            print(f"Kullanilan Model Ismi: LightGBM Regressor")
+            print(f"Dogrulama Seti Simetrik Mutlak Ortalama Yuzdesel Hata: {self.metrics['sMAPE']:.4f}")
+            print(f"R² Skoru: {self.metrics['R2']:.4f}")
+            print(f"Gerceklestirilen Tahmin Miktari: {len(forecast_df)} Adet\n28 Gun * {forecast_df['item_id'].nunique()} Urun")
+            print(f"Ciktilarin Bulundugu Dosya Yolu: {self.artifacts_path}/")
+            
+            return self.model, forecast_df, self.metrics
+        
+        except Exception as err:
+            raise Exception(f"LightGBM Modeli Pipeline'i Basarisiz Oldu: {err}")
+
+def main():
+    """LightGBM Modeli ile Tahminlemeyi Gerceklestiren Ana Fonksiyondur"""
+    if not LIGHTGBM_AVAILABLE:
+        print("LightGBM Modeli Icin Ilgili Kutuphaneyi Dahil Ediniz")
+        return
+    
+    try:
+        forecaster = LightGBMModelMultiItemForecaster()
+        
+        # Pipeline'i calistiralim
+        model, forecast, metrics = forecaster.run_lightgbm_pipeline()
+        print("LightGBM ile Coklu Urun Tahminlemesi Basariyla Gerceklestirildi")
+    except KeyboardInterrupt:
+        print("Kullanici Tarafindan Uygulama Durduruldu")
+    except Exception as err:
+        print(f"LightGBM Pipeline Sureci Basarisizlikla Sonuclandi: {err}")
+
+if __name__ == '__main__':
+    main()
