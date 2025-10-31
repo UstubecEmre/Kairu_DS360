@@ -37,7 +37,10 @@ def create_features():
                                , index_col= 'date')
         print(f"Egitim DataFrame'inin Boyutu: {train_df.shape}")
         
-        valid_df = pd.read_csv(r'D:\Kairu_DS360_Projects\fifth_week_project\m5_forecasting\artifacts\datasets\valid.csv', parse_dates=['date'])
+        valid_df = pd.read_csv(r'D:\Kairu_DS360_Projects\fifth_week_project\m5_forecasting\artifacts\datasets\validation.csv',
+                               parse_dates=['date']
+                               ,index_col = 'date')
+        
         print(f"Dogrulama DataFrame'inin Boyutu: {valid_df.shape}")
         
         
@@ -196,10 +199,10 @@ def create_features():
     print(f"fe_valid Dosya Yolu: {fe_valid_path}")
     
     X_train.to_parquet(r"D:\Kairu_DS360_Projects\fifth_week_project\m5_forecasting\artifacts\datasets\X_train.parquet")
-    y_train.to_parquet(r"D:\Kairu_DS360_Projects\fifth_week_project\m5_forecasting\artifacts\datasets\y_train.parquet")
+    y_train.to_frame('sales').to_parquet(r"D:\Kairu_DS360_Projects\fifth_week_project\m5_forecasting\artifacts\datasets\y_train.parquet")
     
     X_valid.to_parquet(r"D:\Kairu_DS360_Projects\fifth_week_project\m5_forecasting\artifacts\datasets\X_valid.parquet")    
-    y_valid.to_parquet(r"D:\Kairu_DS360_Projects\fifth_week_project\m5_forecasting\artifacts\datasets\y_valid.parquet")    
+    y_valid.to_frame('sales').to_parquet(r"D:\Kairu_DS360_Projects\fifth_week_project\m5_forecasting\artifacts\datasets\y_valid.parquet")    
     
     
     print("X_train, X_valid, y_train, y_valid Dosyalari Kaydedildi...")
@@ -217,7 +220,7 @@ def create_features():
     
     print("En Yuksek Iliskiye Sahip Oznitelikler")
     for feature, corr in corr_with_target.items():
-        print(f"{feature: 15}: {corr:6.4f}")
+        print(f"{feature:15}: {corr:6.4f}")
         
     # Gorsellestirme
     print("Ozniteliklerin Dagilim Grafikleri Olusturuluyor...")
