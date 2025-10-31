@@ -53,7 +53,7 @@ class ARIMAModelSingleItemForecaster:
         os.makedirs(preds_dir, exist_ok=True)
         os.makedirs(figures_dir, exist_ok=True)
         """ 
-        for sub_dir in [model_dir, preds_dir, figures_dir]:
+        for sub_dir in [model_dir, predictions_dir, figures_dir]:
             os.makedirs(os.path.join(self.artifacts_path, sub_dir), exist_ok=True)
         """
     def select_top_item(self):
@@ -61,7 +61,9 @@ class ARIMAModelSingleItemForecaster:
         print("[INFO] En Cok Satan Urun Seciliyor...")
         try:
             # egitim verisini yukleyelim
-            train_df = pd.read_csv(r"D:\Kairu_DS360_Projects\fifth_week_project\m5_forecasting\artifacts\datasets\train.csv")
+            train_df = pd.read_csv(r"D:\Kairu_DS360_Projects\fifth_week_project\m5_forecasting\artifacts\datasets\train.csv"
+                                   ,parse_dates= ['date']
+                                   ,index_col= 'date')
             
             # urun bazinda toplam satislari hesaplayalim
             item_totals = train_df.groupby('item_id')['sales'].sum().sort_values(ascending=False)
@@ -84,8 +86,12 @@ class ARIMAModelSingleItemForecaster:
         print(f"[INFO] Zaman Serisi Verisi Yukleniyor: {self.item_id}")
         try:
             # egitim verisini yukleyelim
-            train_df = pd.read_csv(r"D:\Kairu_DS360_Projects\fifth_week_project\m5_forecasting\artifacts\datasets\train.csv")
-            valid_df = pd.read_csv(r"D:\Kairu_DS360_Projects\fifth_week_project\m5_forecasting\artifacts\datasets\validation.csv")
+            train_df = pd.read_csv(r"D:\Kairu_DS360_Projects\fifth_week_project\m5_forecasting\artifacts\datasets\train.csv"
+                                   ,parse_dates= ['date']
+                                   ,index_col= 'date')
+            valid_df = pd.read_csv(r"D:\Kairu_DS360_Projects\fifth_week_project\m5_forecasting\artifacts\datasets\validation.csv"
+                                   ,parse_dates= ['date']
+                                   ,index_col= 'date')
         # secilen urunun zaman serisi verisini alalim
         
             item_train = train_df[train_df['item_id'] == self.item_id]['sales'].copy()
@@ -142,8 +148,8 @@ class ARIMAModelSingleItemForecaster:
             print(f"Duragan Degil (Non-Stationary) p-Degeri > 0.05")
             is_stationary = False
             
-        return {"is_stationary": is_stationary, "p_value": adf_result[1], "adf_stat": adf_result[0]}
-
+        # return {"is_stationary": is_stationary, "p_value": adf_result[1], "adf_stat": adf_result[0]}
+        return is_stationary, adf_result[1]
     
     
     def determine_d_parameter(self):
@@ -205,9 +211,9 @@ class ARIMAModelSingleItemForecaster:
             for q in q_values:
                 current_combination += 1
                 try:
-                    print(f"ARIMA Yontemi Icin ({p}, {q}, {d}) Parametreleri Deneniyor... ({current_combination}/{total_combinations}")
+                    print(f"ARIMA Yontemi Icin ({p}, {d}, {q}) Parametreleri Deneniyor... ({current_combination}/{total_combinations}")
                     # modeli egitelim
-                    model = ARIMA(self.train_series, order = (p, q, d))
+                    model = ARIMA(self.train_series, order = (p, d, q)) # sira cok onemli, yoksa hata alirsin!!!
                     fitted_model = model.fit()
                     
                     aic = fitted_model.aic
@@ -230,7 +236,7 @@ class ARIMAModelSingleItemForecaster:
                         best_params = (p, d, q)
                         print(f"En Iyi AIC = {aic:.4f}")
                 except Exception as err:
-                    print(f"Beklenmeyen Bir Hata Olustu: {str(err)[:25]}")
+                    print(f"Beklenmeyen Bir Hata Olustu: {str(err)[:50]}")
                     results.append(
                         {
                             'p': p
@@ -374,6 +380,7 @@ class ARIMAModelSingleItemForecaster:
     def create_visualizations(self):
         """Gorsellestirmeleri Gerceklestirir"""
         print("Gorsellestirme Islemi Baslatiliyor...")
+    
         fig, axes = plt.subplots(2, 2, figsize = (12, 8))
         
         # Ana tahmin
@@ -384,7 +391,7 @@ class ARIMAModelSingleItemForecaster:
                   ,train_plot.values
                   ,label = 'Gercek Egitim Verileri'
                   ,color = 'skyblue'
-                  ,ilnewidth = 1.5)
+                  ,linewidth = 1.5)
         
         axs1.plot(self.valid_series.index
                   ,self.valid_series.values
@@ -418,7 +425,7 @@ class ARIMAModelSingleItemForecaster:
             ,color = 'orange'
             ,alpha = 0.6
         )
-        axs2.axhilne(
+        axs2.axhline(
             y = 0
             ,color = 'black'
             ,linestyle = '-'
@@ -429,7 +436,7 @@ class ARIMAModelSingleItemForecaster:
         axs2.grid(True, alpha = 0.2)
         
         # Artik degerleri icin ACF
-        axs3 = [1, 0]
+        axs3 = axes[1, 0]
         try:
             plot_acf(residuals.dropna()
                      ,ax = axs3
@@ -448,7 +455,7 @@ class ARIMAModelSingleItemForecaster:
                            ,fontweight = 'bold')
         
         #Artiklar icin PACF 
-        axs4 = [1, 1]
+        axs4 = axes[1, 1]
         try:
             plot_pacf(residuals.dropna()
                       ,ax = axs4
@@ -516,7 +523,7 @@ class ARIMAModelSingleItemForecaster:
     def save_results(self):
         """Sonuclari Kaydeder"""
         print("Model Sonuclariniz Models Klasorune Kaydediliyor...")
-        model_path = f'{self.artifact_path}/models/arima_{self.item_id}.pkl'
+        model_path = f'{self.artifacts_path}/models/arima_{self.item_id}.pkl'
             
         with open(model_path, 'wb') as file:
             pickle.dump(
@@ -541,7 +548,7 @@ class ARIMAModelSingleItemForecaster:
             }
         )
             
-        pred_path = f'{self.artifacts_path}/preds/arima_forecast_{self.item_id}.csv'
+        pred_path = f'{self.artifacts_path}/predictions/arima_forecast_{self.item_id}.csv'
         forecast_df.to_csv(pred_path, index = False)
         print(f"Tahminler {pred_path} Dosya Yoluna Kaydedildi")
             
@@ -550,7 +557,7 @@ class ARIMAModelSingleItemForecaster:
         report = {
             'item_id': self.item_id
             ,'model_type': 'ARIMA'
-            ,'params': self.best_parameters
+            ,'params': self.best_params
             ,'train_period': f"{self.train_series.index.min()} to {self.train_series.index.max()}"
             ,'valid_period': f"{self.valid_series.index.min()} to {self.valid_series.index.max()}"
             ,'forecast_steps': len(self.forecast)
@@ -560,7 +567,7 @@ class ARIMAModelSingleItemForecaster:
         }
             
         import json
-        report_path = f"{self.artifacts_path}/preds/arima_report_{self.item_id}.json"
+        report_path = f"{self.artifacts_path}/predictions/arima_report_{self.item_id}.json"
         with open(report_path, 'w') as file:
             json.dump(
                 report
