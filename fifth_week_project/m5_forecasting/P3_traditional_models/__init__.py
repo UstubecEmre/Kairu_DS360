@@ -6,7 +6,7 @@ Icerisinde Bulunanlar:
     - arima_single_item.py
 
 """
-version = "1.0.0"
+__version__ = "1.0.0"
 
 try:
     from .arima_single_item import main as run_arima
