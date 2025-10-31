@@ -28,7 +28,7 @@ def create_features():
     except Exception as err:
         print(f"Hata olustu: {err}")
         return None, None, None, None, None, None
-    
+        
     
     print("Egitim ve Dogrulama Verileri Yukleniyor...")
     
@@ -257,7 +257,7 @@ def create_features():
         plt.savefig(hist_path, dpi = 300, bbox_inches = 'tight')
         print(f"Histogram Dagilimlari Kaydedildi. Dosya Yolu: {hist_path}")
     except FileNotFoundError:
-        print(f"{hist_path} Dosya Yolu Bulunamadi.")
+        raise FileNotFoundError(f"{hist_path} Dosya Yolu Bulunamadi.")
     
     plt.close()
     
@@ -291,7 +291,7 @@ def create_features():
         print(f"[INFO] Korelasyon matrisi başarıyla kaydedildi: {corr_path}")
 
     except Exception as err:
-        print(f"Beklenmeyen Bir Hata Olustu: {err}")
+        raise Exception(f"Beklenmeyen Bir Hata Olustu: {err}")
     plt.close()
     
     
@@ -323,7 +323,7 @@ def save_figures(figure_path: str):
         plt.savefig(figure_path, dpi=300, bbox_inches='tight')
         print(f"Grafik başarıyla kaydedildi: {figure_path}")
     except Exception as err:
-        print(f"Grafik kaydedilirken hata oluştu: {err}")
+        raise Exception(f"Grafik kaydedilirken hata oluştu: {err}")
 
 
 def main():
