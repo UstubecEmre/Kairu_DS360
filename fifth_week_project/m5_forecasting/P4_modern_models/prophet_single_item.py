@@ -86,8 +86,12 @@ class ProphetModelSingleItemForecaster():
         print(f"{self.item_id} Urunu Icin Zaman Serisi Uretiliyor...")
         try:
             # egitim ve dogrulama verilerini yukle
-            train_df = pd.read_csv(r"D:\Kairu_DS360_Projects\fifth_week_project\m5_forecasting\artifacts\datasets\train.csv")
-            valid_df = pd.read_csv(r"D:\Kairu_DS360_Projects\fifth_week_project\m5_forecasting\artifacts\datasets\validation.csv")
+            train_df = pd.read_csv(r"D:\Kairu_DS360_Projects\fifth_week_project\m5_forecasting\artifacts\datasets\train.csv"
+                                   ,parse_dates= ['date']
+                                   ,index_col= 'date')
+            valid_df = pd.read_csv(r"D:\Kairu_DS360_Projects\fifth_week_project\m5_forecasting\artifacts\datasets\validation.csv"
+                                   ,parse_dates= ['date']
+                                   ,index_col= 'date')
             
             item_train = train_df[train_df['item_id'] == self.item_id]['sales'].copy()
             item_valid = valid_df[valid_df['item_id'] == self.item_id]['sales'].copy()
@@ -204,7 +208,7 @@ class ProphetModelSingleItemForecaster():
         # Gercek degerler
         y_true = self.valid_series.values
         # Tahmin degerleri 
-        y_pred = forecast_period['yhat'].values[:len[y_true]] # ayni boyutta olmalilar.
+        y_pred = forecast_period['yhat'].values[:len(y_true)] # ayni boyutta olmalilar.
         
         # Degerlendirme Metrikleri
         mae = mean_absolute_error(y_true, y_pred)
@@ -579,11 +583,11 @@ class ProphetModelSingleItemForecaster():
             # Zaman serisi yukle
             self.load_time_series()
             # Prophet formatina cevir
+            prophet_train_df, prophet_valid_df = self.prepare_prophet_data()
             
-            self.prepare_prophet_data()
             
             # Prophet model egitimini gerceklestir
-            self.train_prophet_model()
+            self.train_prophet_model(prophet_train_df)
             
             # Prophet modeli ile tahmin gerceklestir
             forecast_period = self.make_prophet_forecast()
@@ -595,14 +599,14 @@ class ProphetModelSingleItemForecaster():
             self.calc_visualizations(forecast_period)
             
             # Sonuclari kaydet
-            self.save_results()
+            self.save_results(forecast_period=forecast_period)
 
             print(f"Karsilastirma Tamamlandi. Ozet Raporlara Geciliyor...")
             print(f"Prophet Model:{self.item_id}")
             print(f"Prophet Model Simetrik Ortalama Mutlak Yuzdesel Hata: {self.metrics['sMAPE']:.4f}%")
             
             if self.arima_metrics:
-                print(f"ARIMA Modeli Simetrik Ortalama Mutlak Yuzdesel Hata: {self.arima_metrics["sMAPE"]:.4f}%")
+                print(f"ARIMA Modeli Simetrik Ortalama Mutlak Yuzdesel Hata: {self.arima_metrics['sMAPE']:.4f}%")
                 better = "Prophet" if self.metrics['sMAPE'] < self.arima_metrics['sMAPE'] else "ARIMA"
                 print(f"sMAPE Degerlendirme Metrigine Gore Kazanan Model: {better}")
             print(f"Ciktilar Kaydediliyor. {self.artifacts_path}/ Dosya Yoluna Bakabilirsiniz.")
@@ -628,10 +632,11 @@ def main():
         model, forecast, metrics = forecaster.run_prophet_pipeline()
         print("Islem Basariyla Gerceklesti")
     except KeyboardInterrupt:
-        print("Kullanici Tarafindan Islem Durduruldu")
+        raise KeyboardInterrupt("Kullanici Tarafindan Islem Durduruldu")
+        
     except Exception as err:
-        print(f"Pipeline Sirasinda Beklenmeyen Bir Hata Olustu: {err}")
-
+        raise Exception(f"Pipeline Sirasinda Beklenmeyen Bir Hata Olustu: {err}")
+        
 
 if __name__ == '__main__':
     main()
