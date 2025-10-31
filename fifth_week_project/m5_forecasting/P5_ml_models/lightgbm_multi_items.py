@@ -68,10 +68,11 @@ class LightGBMModelMultiItemForecaster:
             print(f"Egitim Seti Urun Sayisi: {train_items}")
             print(f"Dogrulama Seti Urun Sayisi: {valid_items}")
         except FileNotFoundError:    
-            print("Ilgili Dosya Yollari Bulunamadi")
-        
+            raise FileNotFoundError("Ilgili Dosya Yollari Bulunamadi")
+            
         except Exception as err:
-            print(f"Beklenmeyen Bir Hata Olustu: {err}")
+            raise Exception(f"Beklenmeyen Bir Hata Olustu: {err}")
+         
             
     def encode_categorical_features(self):
         """Kategorik Verileri Sayisal Hale Donusturur"""
@@ -103,7 +104,7 @@ class LightGBMModelMultiItemForecaster:
                         else:
                             valid_encoded.append(0)
                     self.valid_df[f'{col}_encoded'] = valid_encoded
-                
+                    raise Exception(f"Beklenmeyen Deger Hatasi Gerceklesti: {err}")
                 # Encoder nesnemizi saklayalim
                 self.label_encoders[col] = le
                 print(f"Egitim Verisi Benzersiz Degerleri: {self.train_df[f'{col}_encoded'].nunique()}")
@@ -172,7 +173,7 @@ class LightGBMModelMultiItemForecaster:
         print("LightGBM Model Egitimi Baslatiliyor...")
         try:
             lgb_params = {
-                'objective': 'regressive'
+                'objective': 'regression'
                 ,'metric': 'rmse'
                 ,'boosting_type': 'gbdt'
                 ,'num_leaves': 31 
@@ -188,15 +189,15 @@ class LightGBMModelMultiItemForecaster:
                 print(f"{key} Degeri : {value}")
                 
             # Veri setlerini olusturalim
-            train_data = lgb.DataSet(X_train, label = y_train)
-            valid_data = lgb.DataSet(X_valid, label = y_valid, reference = train_data)
+            train_data = lgb.Dataset(X_train, label = y_train)
+            valid_data = lgb.Dataset(X_valid, label = y_valid, reference = train_data)
             
             print("LightGBM Model Egitimi Baslatiliyor")
             
             self.model = lgb.train(
                 lgb_params
                 ,train_data
-                ,valid_data
+                ,valid_sets=[train_data, valid_data]
                 ,valid_names = ['train', 'valid']
                 ,num_boost_round = 500
                 ,callbacks = [
@@ -209,8 +210,8 @@ class LightGBMModelMultiItemForecaster:
             print(f"Dogrulama Seti RMSE Degeri: {self.model.best_score['valid']['rmse']}")
             
         except Exception as err:
-            print(f"Model Egitiminde Beklenmeyen Hata Gerceklesti: {err}")
-        
+            raise Exception(f"Model Egitiminde Beklenmeyen Hata Gerceklesti: {err}")
+            
         
     def calculate_validation_metrics(self, X_valid, y_valid):
         """Dogrulama Seti Metrik Degerlerini Hesaplar"""
@@ -516,9 +517,10 @@ def main():
         model, forecast, metrics = forecaster.run_lightgbm_pipeline()
         print("LightGBM ile Coklu Urun Tahminlemesi Basariyla Gerceklestirildi")
     except KeyboardInterrupt:
-        print("Kullanici Tarafindan Uygulama Durduruldu")
+        raise Exception("Kullanici Tarafindan Uygulama Durduruldu")
+        
     except Exception as err:
-        print(f"LightGBM Pipeline Sureci Basarisizlikla Sonuclandi: {err}")
-
+        raise Exception(f"LightGBM Pipeline Sureci Basarisizlikla Sonuclandi: {err}")
+        
 if __name__ == '__main__':
     main()
