@@ -6,7 +6,7 @@ Icerisinde Bulunanlar:
     - feature_engineering.py 
 """
 
-version = "1.0.0"
+__version__ = "1.0.0"
 try:
     from .feature_engineering import main as create_features
     
