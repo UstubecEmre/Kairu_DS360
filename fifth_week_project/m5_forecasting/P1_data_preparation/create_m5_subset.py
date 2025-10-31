@@ -85,27 +85,29 @@ def create_m5_subset():
     #print("Number of products in CA_1 store:", ca1_sales.shape[0])
     print(f"CA_1 magazasindaki urun sayisi: {ca1_sales.shape[0]}")
     
-    foods_mask = (ca1_sales['category_id'] == 'FOODS')
-    food_sales = ca1_sales[foods_mask].copy()
+    foods_mask = ca1_sales['cat_id'].str.contains('FOOD', case=False, na=False)
+    foods_sales = ca1_sales[foods_mask].copy()
+
+    
     #print(f"Number of FOOD products in CA_1 store: {food_sales.shape[0]}")
-    print(f"CA_1 magazasindaki FOOD kategorisi urun sayisi: {food_sales.shape[0]}")
+    print(f"CA_1 magazasindaki FOOD kategorisi urun sayisi: {foods_sales.shape[0]}")
     
     
-    if len(food_sales) == 0:
+    if len(foods_sales) == 0:
         #print("No FOOD category products found in CA_1 store. We will proceed with all products from CA_1 store.")
         print("CA_1 magazasinda FOOD kategorisi urunu bulunamadi. CA_1 magazasindaki tum urunlerle devam edilecek.")
-        food_sales = ca1_sales.copy()
+        foods_sales = ca1_sales.copy()
     
     # top 5 sold items (en cok satan 5 urun)
     #print("Selecting top 5 sold items...")
     print("En cok satan 5 urun seciliyor...")
-    sales_cols = [col for col in food_sales.columns if col.startswith('d_')]
+    sales_cols = [col for col in foods_sales.columns if col.startswith('d_')]
     #print(f"Total day columns found: {len(sales_cols)}")
     print(f"Toplam gun kolon sayisi: {len(sales_cols)}")
     
-    food_sales['total_sales'] = food_sales[sales_cols].sum(axis=1)
+    foods_sales['total_sales'] = foods_sales[sales_cols].sum(axis=1)
     
-    top5_food_items = food_sales.nlargest(5, 'total_sales')
+    top5_food_items = foods_sales.nlargest(5, 'total_sales')
     # print("Top 5 sold items selected:")
     print("En cok satan 5 urun secildi:")
     for idx, (_, item) in enumerate(top5_food_items.iterrows(), start=1):
