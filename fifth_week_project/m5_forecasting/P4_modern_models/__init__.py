@@ -6,7 +6,7 @@ Icerisinde Bulunanlar:
     - prophet_single_item.py
 """
 
-version = "1.0.0"
+__version__ = "1.0.0"
 
 try:
     from .prophet_single_item import main as run_prophet
