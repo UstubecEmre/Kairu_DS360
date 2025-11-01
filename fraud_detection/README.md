@@ -119,9 +119,9 @@ python src/fraud_detection_pipeline.py
 
 #### **6. Teşekkürler:**
 
-Bu eğitimde bizlere yol gösterici olan **Kairu** platformunun kurucusu ve değerli eğitmenimiz **Yasemin Arslan'a** ve her daim yardımını esirgemeyen **Kariu mentoruma** teşekkürlerimi sunarım.
+Bu eğitimde bizlere yol gösterici olan **Kairu** platformunun kurucusu ve değerli eğitmenimiz **Yasemin Arslan'a** ve her daim yardımını esirgemeyen **Kairu mentoruma** teşekkürlerimi sunarım.
 
 [Daha fazla bilgi için veri seti](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud)
 
-**Not: Projeyi çalıştırırken GPU kullanmanız tavsiye edilir, CPU ile işlemler saatleri aşabilmektedir.
-Bu anlamda benim gibi uzun süre bekleyip terminali sonlandırmak isterseniz <mark>**CTRL+C\*\*</mark> kullanabilirsiniz.
+**Not**: Projeyi çalıştırırken GPU kullanmanız tavsiye edilir, CPU ile işlemler saatleri aşabilmektedir.
+Bu anlamda benim gibi uzun süre bekleyip terminali sonlandırmak isterseniz **CTRL+C** kullanabilirsiniz.
